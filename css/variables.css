@@ -1,0 +1,34 @@
+/* =============================================
+   VARIABLES - Colors, Fonts, Reusable Values
+   ============================================= */
+
+:root {
+  /* Colors */
+  --bg: #efe3c7;
+  --ink: #2b241b;
+  --wood: #5a3c24;
+  --wood2: #3b2616;
+  --paper: #f6edd8;
+  --paper2: #ead9b6;
+  --accent: #b53a2a;
+  --shadow: rgba(0,0,0,.18);
+  --radius: 18px;
+  --good: #0e6a2f;
+}
+
+/* Base Reset */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 10% 10%, rgba(0,0,0,.05), transparent 40%),
+    radial-gradient(circle at 90% 0%, rgba(0,0,0,.05), transparent 45%),
+    linear-gradient(180deg, var(--bg), #e8d5ab 70%, #e1c999);
+  padding: 16px;
+  min-height: 100vh;
+}

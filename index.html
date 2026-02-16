@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catan Scoreboard</title>
+  
+  <!-- CSS Files -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+  <div class="wrap">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <input id="boardTitle" type="text" value="Catan Scoreboard" aria-label="Board title" maxlength="100" />
+        <div class="header-meta">
+          <div class="pill" style="padding:6px 10px;">
+            <span style="font-weight:900; font-size:11px; opacity:.8;">Win:</span>
+            <div class="numstep" style="gap:4px; margin-left:4px;">
+              <button data-step="winPoints" data-dir="-1" aria-label="Decrease win points" style="width:20px;height:20px;font-size:12px;padding:0;">-</button>
+              <input id="winPoints" type="number" min="1" max="50" value="10" aria-label="Winning points" style="width:36px;padding:4px;font-size:12px;text-align:center;" />
+              <button data-step="winPoints" data-dir="1" aria-label="Increase win points" style="width:20px;height:20px;font-size:12px;padding:0;">+</button>
+            </div>
+          </div>
+          <div class="pill" style="padding:6px 10px;">
+            <span style="font-weight:900; font-size:11px; opacity:.8;">Ruleset:</span>
+            <select id="ruleset" aria-label="Ruleset" style="margin-left:6px;padding:4px 8px;border-radius:8px;border:1px solid rgba(0,0,0,.18);background:rgba(255,255,255,.9);font-weight:900;font-size:11px;">
+              <option value="base">Base</option>
+              <option value="eap">E&P</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="header-status">
+          <div class="pill">
+            <span style="font-weight:900; font-size:11px;">⏱️</span>
+            <span class="mono" id="timerText" style="font-size:14px;">00:00:00</span>
+          </div>
+          <div class="pill" id="roundPill" style="display:none">
+            <span style="font-weight:900; font-size:11px;">Round</span>
+            <span class="mono" id="roundText" style="font-size:14px;">1</span>
+          </div>
+          <div class="pill">
+            <span style="font-weight:900; font-size:11px;">Turn:</span>
+            <span class="mono" id="turnText" style="font-size:12px;">P1</span>
+          </div>
+        </div>
+        <div class="header-controls">
+          <button class="btn-icon" id="startGameBtn" title="Start (S)">▶️</button>
+          <button class="btn-icon" id="pauseGameBtn" title="Pause (P)">⏸️</button>
+          <button class="btn-icon" id="resetTimerBtn" title="Reset Timer">🔄</button>
+          <button class="btn-icon" id="undoBtn" title="Undo (Ctrl+Z)">↩️</button>
+          <button class="btn-icon" id="redoBtn" title="Redo (Ctrl+Y)">↪️</button>
+          <button class="btn-icon danger" id="endGameBtn" title="End Game">⏹️</button>
+          <button class="btn-icon" id="settingsBtn" title="Settings">⚙️</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div class="dashboard">
+      <!-- Left: Players Section -->
+      <div class="dashboard-left">
+        <section class="card">
+          <div class="row" style="justify-content:space-between">
+            <div>
+              <div class="kicker">Scoreboard</div>
+              <h2 class="section-title" style="margin-top:10px">Players</h2>
+            </div>
+            <div class="row">
+              <button class="btn secondary" id="resetScoresBtn" title="Reset all player scores">Reset scores</button>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
+            <div class="inlineCheck">
+              <input id="autoWin" type="checkbox" checked style="width:auto;" aria-label="Auto highlight winner" />
+              <label for="autoWin" style="font-weight:900; font-size:12.5px;">Auto highlight winner</label>
+            </div>
+            <div class="inlineCheck">
+              <input id="roundEnabled" type="checkbox" style="width:auto;" aria-label="Enable round counter" />
+              <label for="roundEnabled" style="font-weight:900; font-size:12.5px;">Round counter</label>
+            </div>
+          </div>
+
+          <div class="score-grid" id="players"></div>
+        </section>
+      </div>
+
+      <!-- Right: Dice & Stats Section -->
+      <div class="dashboard-right">
+        <section class="card">
+          <div class="row" style="justify-content:space-between; align-items:flex-start">
+            <div>
+              <div class="kicker">Dice</div>
+              <h2 class="section-title" style="margin-top:10px">Virtual 2d6</h2>
+            </div>
+            <div class="row">
+              <button class="btn" id="rollBtn" title="Roll (R)">Roll</button>
+              <button class="btn ghost" id="undoRollBtn" title="Undo roll">↩️</button>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="dice">
+            <div class="die" id="die1" aria-label="Die 1" role="img"></div>
+            <div class="die" id="die2" aria-label="Die 2" role="img"></div>
+
+            <div class="pill">
+              <div style="font-weight:900; font-size:11px;">Last</div>
+              <div class="mono" id="lastRoll" style="font-size:13px;">-</div>
+            </div>
+
+            <div class="pill">
+              <div style="font-weight:900; font-size:11px;">Rolls</div>
+              <div class="mono" id="rollCount" style="font-size:13px;">0</div>
+            </div>
+
+            <div class="pill">
+              <div style="font-weight:900; font-size:11px;">Turn</div>
+              <div class="mono" id="turnText" style="font-size:13px;">P1</div>
+            </div>
+          </div>
+
+          <div style="height:8px"></div>
+
+          <div class="pill" style="width:100%; justify-content:center; padding:8px;">
+            <span style="font-weight:900; font-size:11px; opacity:.8;">Manual:</span>
+            <input id="manualTotal" class="mono" type="number" min="2" max="12" placeholder="2-12" aria-label="Manual roll"
+              style="width:70px;margin:0 8px;padding:6px;border-radius:8px;border:1px solid rgba(0,0,0,.18);background:rgba(255,255,255,.6);font-weight:900;font-size:12px;text-align:center;" />
+            <button class="btn secondary" id="addManualBtn" style="padding:6px 12px;font-size:12px;">Add</button>
+          </div>
+
+          <div style="height:8px"></div>
+          <div class="divider"></div>
+
+          <div style="margin-top:8px;">
+            <div class="small" style="font-weight:900; margin-bottom:8px">Distribution</div>
+            <canvas id="barChart" role="img" aria-label="Bar chart" style="height:180px;"></canvas>
+          </div>
+        </section>
+
+        <!-- Statistics Cards -->
+        <section class="card">
+          <div style="display:grid; gap:10px;">
+            <div>
+              <div class="label">🔥 Hot Numbers</div>
+              <div class="value" style="font-size:14px; line-height:1.5; margin-top:4px;" id="statHot">
+                <div class="small">Roll some dice!</div>
+              </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div>
+              <div class="label">❄️ Cold Numbers</div>
+              <div class="value" style="font-size:14px; line-height:1.5; margin-top:4px;" id="statCold">
+                <div class="small">Roll some dice!</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <button class="btn secondary" id="resetDiceBtn" style="width:100%;" title="Reset all dice statistics">Reset Dice Stats</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <div class="overlay" id="confirmModal">
+    <div class="modal">
+      <h3 id="confirmTitle">Confirm action</h3>
+      <div class="small" id="confirmMessage" style="font-weight:900; margin-bottom:10px;"></div>
+      <div class="divider"></div>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn secondary" id="confirmCancelBtn">Cancel</button>
+        <button class="btn danger" id="confirmOkBtn">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="endModal">
+    <div class="modal">
+      <h3 id="endTitle">End game</h3>
+      <div class="small" id="endHint" style="font-weight:900; margin-bottom:10px;">Review the winner preview and confirm.</div>
+      <div class="stats-grid" id="endSummary"></div>
+      <div class="divider"></div>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn secondary" id="closeEndBtn">Cancel</button>
+        <button class="btn danger" id="confirmEndBtn">Confirm end game</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="settingsModal">
+    <div class="modal settings-modal">
+      <h3>⚙️ Settings</h3>
+      <div class="settings-tabs">
+        <button class="settings-tab active" data-settings-tab="history">History</button>
+        <button class="settings-tab" data-settings-tab="backup">Backup</button>
+      </div>
+      <div class="divider"></div>
+      <div class="settings-content active" id="settings-history">
+        <h4>Game History</h4>
+        <div class="stats-grid" id="historyStats"></div>
+        <div style="height:12px"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Winner</th>
+              <th>Margin</th>
+              <th>Duration</th>
+            </tr>
+          </thead>
+          <tbody id="historyTable"></tbody>
+        </table>
+        <div style="height:12px"></div>
+        <button class="btn secondary" id="clearHistoryBtn">Clear history</button>
+      </div>
+      <div class="settings-content" id="settings-backup">
+        <h4>Backup & Restore</h4>
+        <div class="row" style="gap:8px; flex-wrap:wrap;">
+          <button class="btn" id="exportNowBtn">Export backup</button>
+          <button class="btn secondary" id="createSnapshotBtn">Create snapshot</button>
+        </div>
+        <div class="divider"></div>
+        <div class="inlineCheck">
+          <input id="autoSnapshotOnEnd" type="checkbox" checked style="width:auto;" />
+          <label for="autoSnapshotOnEnd" style="font-weight:900; font-size:12.5px;">Auto snapshot on end game</label>
+        </div>
+        <div style="height:12px"></div>
+        <label class="small" style="font-weight:900;">Import backup file:</label>
+        <input id="importFile" type="file" accept="application/json,.json" style="margin-top:6px;" />
+        <button class="btn secondary" id="importBtn" style="margin-top:8px;">Import</button>
+      </div>
+      <div class="divider"></div>
+      <button class="btn secondary" id="closeSettingsBtn">Close</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="victoryOverlay">
+    <div class="modal">
+      <div id="confettiLayer"></div>
+      <h2 id="victoryTitle">Winner!</h2>
+      <div class="sub mono" id="victorySub">Margin: 0</div>
+      <div class="photoWrap" id="victoryPhotoWrap" style="width: min(420px, 100%); margin: 0 auto 14px; border-radius: 16px; overflow: hidden; border: 1px solid rgba(0,0,0,.12); background: rgba(255,255,255,.55); aspect-ratio: 4 / 3; position: relative;">
+        <img id="victoryPhoto" alt="Winner photo" style="width:100%; height:100%; object-fit:cover; display:block;" />
+      </div>
+      <div class="scoreline mono" id="victoryScores"></div>
+      <div style="height:12px"></div>
+      <button class="btn" id="closeVictoryBtn">Close</button>
+    </div>
+  </div>
+
+  <!-- Big Dice Overlay -->
+  <div class="dice-overlay" id="diceOverlay">
+    <div class="dice-overlay-content">
+      <div class="die-big" id="dieBig1"></div>
+      <div class="die-big" id="dieBig2"></div>
+      <div class="dice-total" id="diceTotal">Total: 7</div>
+    </div>
+  </div>
+
+  <!-- Toast Notifications -->
+  <div id="toast" class="toast"></div>
+
+  <!-- JavaScript Files -->
+  <script src="js/config.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/dice.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Backup files
+*.bak
+*.tmp
+*~
+
+# Node modules (if we add them later)
+node_modules/
