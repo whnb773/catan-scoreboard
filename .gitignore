@@ -17,3 +17,9 @@
 
 # Node modules (if we add them later)
 node_modules/
+
+# SSH/SFTP Keys - NEVER commit these!
+*.pem
+*.ppk
+siteground_key.pem
+.vscode/sftp.json
