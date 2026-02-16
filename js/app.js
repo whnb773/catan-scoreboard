@@ -586,6 +586,17 @@ function init() {
     }
   });
 
+  // Firebase auth buttons
+  qs("#loginBtn").addEventListener("click", signInWithGoogle);
+  qs("#logoutBtn").addEventListener("click", signOutUser);
+
+  // Initialize Firebase auth
+  if (window.firebaseAuth) {
+    initAuth();
+  } else {
+    console.warn('Firebase not initialized');
+  }
+
   console.log("Catan Scoreboard initialized successfully!");
 }
 

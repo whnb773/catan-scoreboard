@@ -153,3 +153,6 @@ coverage/
 *.zip
 *.tar.gz
 *.rar
+
+# Firebase config (contains API keys)
+js/firebase-config.js

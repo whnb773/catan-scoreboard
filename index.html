@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Catan Scoreboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
   
   <!-- CSS Files -->
   <link rel="stylesheet" href="css/variables.css">
@@ -37,6 +38,26 @@
       </div>
 
       <div class="header-right">
+        <!-- NEW: Auth section -->
+        <div id="authSection" style="display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+          <!-- Not logged in -->
+          <div id="notLoggedIn" style="display:flex; gap:8px; align-items:center;">
+            <span style="font-size:12px; opacity:.8;">Not signed in</span>
+            <button class="btn" id="loginBtn" style="padding:8px 16px; font-size:13px;">
+              🔐 Sign in with Google
+            </button>
+          </div>
+
+          <!-- Logged in -->
+          <div id="loggedIn" style="display:none; align-items:center; gap:8px;">
+            <img id="userPhoto" src="" alt="User" style="width:32px; height:32px; border-radius:50%; border:2px solid rgba(255,255,255,.3);" />
+            <span id="userName" style="font-size:13px; font-weight:900;"></span>
+            <button class="btn secondary" id="logoutBtn" style="padding:6px 12px; font-size:12px;">
+              Sign out
+            </button>
+          </div>
+        </div>
+
         <div class="header-status">
           <div class="pill">
             <span style="font-weight:900; font-size:11px;">⏱️</span>
@@ -274,12 +295,35 @@
   <!-- Toast Notifications -->
   <div id="toast" class="toast"></div>
 
+  <!-- Firebase SDK -->
+  <script type="module">
+    // Import Firebase modules
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+    import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+    
+    // Import our config
+    import { firebaseConfig } from './js/firebase-config.js';
+    
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    window.firebaseApp = app;
+    window.firebaseAuth = getAuth(app);
+    window.firebaseDb = getFirestore(app);
+    window.firebaseAuthMethods = { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut };
+    window.firestoreMethods = { doc, setDoc, getDoc, collection, query, where, getDocs };
+    
+    console.log('Firebase initialized!');
+  </script>
+
   <!-- JavaScript Files -->
   <script src="js/config.js"></script>
   <script src="js/state.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/dice.js"></script>
+  <script src="js/firebase-auth.js"></script>
+  <script src="js/firebase-firestore.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

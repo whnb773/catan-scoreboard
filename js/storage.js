@@ -46,9 +46,17 @@ function persist(state) {
 
 // Save all current data
 function saveAll() {
+  // Always save to localStorage (instant, works offline)
   const ok = persist(exportState());
   if (!ok) {
     showToast("Save failed. Storage may be full.", "error");
+  }
+  
+  // Also save to Firestore if logged in (async, doesn't block UI)
+  if (getCurrentUser && getCurrentUser()) {
+    saveToFirestore().catch(err => {
+      console.warn('Background cloud save failed:', err);
+    });
   }
 }
 
