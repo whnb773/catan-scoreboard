@@ -34,6 +34,103 @@
     </div>
   </div>
 
+  <!-- Host / Join Screen (signed in, no active game) -->
+  <div id="hostJoinScreen" class="hj-screen" style="display:none">
+    <div class="hj-card">
+
+      <!-- User identity bar -->
+      <div class="hj-user-bar">
+        <div class="hj-user-info">
+          <img id="hjUserPhoto" src="" alt="User" class="hj-user-photo">
+          <span id="hjUserName" class="hj-user-name"></span>
+          <span id="hjAdminBadge" class="admin-badge" style="display:none">Admin</span>
+        </div>
+        <button class="btn secondary" id="hjSignOutBtn" style="padding:6px 12px; font-size:12px;">Sign out</button>
+      </div>
+
+      <!-- App identity -->
+      <div style="text-align:center; padding:8px 0 4px;">
+        <div class="login-logo" style="font-size:48px; margin-bottom:10px;">🎲</div>
+        <h2 class="hj-title">Catan Scoreboard</h2>
+      </div>
+
+      <!-- Sub-view: choose Host or Join -->
+      <div id="hjChoose">
+        <p class="hj-subtitle">Start a new game or join one already in progress.</p>
+        <div class="hj-options">
+          <button class="btn hj-big-btn" id="hjHostBtn">🏠&nbsp; Host a Game</button>
+          <button class="btn secondary hj-big-btn" id="hjJoinBtn">🚪&nbsp; Join a Game</button>
+        </div>
+        <div id="hjContinueWrap" style="display:none; margin-top:14px;">
+          <div class="hj-or-line"><span>or</span></div>
+          <button class="btn ghost hj-big-btn" id="hjContinueBtn">Continue saved game &rarr;</button>
+        </div>
+      </div>
+
+      <!-- Sub-view: hosting — PIN + QR + player list -->
+      <div id="hjHosting" style="display:none">
+        <div class="hj-pin-block">
+          <div class="hj-pin-label">Share this PIN with players</div>
+          <div class="hj-pin mono" id="hjPinDisplay">------</div>
+          <div class="hj-pin-hint">PIN expires after 2 hours</div>
+        </div>
+        <div id="hjQrCode" class="hj-qr"></div>
+        <div class="hj-divider"></div>
+        <div class="hj-section-label">Players in lobby</div>
+        <div id="hjLobbyPlayers" class="hj-lobby-players">
+          <div class="hj-lobby-empty">Waiting for players to join…</div>
+        </div>
+        <div class="hj-divider"></div>
+        <div class="hj-actions">
+          <button class="btn secondary" id="hjCancelHostBtn">Cancel</button>
+          <button class="btn" id="hjStartGameBtn">Start Game &rarr;</button>
+        </div>
+      </div>
+
+      <!-- Sub-view: joining — PIN entry -->
+      <div id="hjJoining" style="display:none">
+        <p class="hj-subtitle">Enter the 6-digit PIN shown on the host's screen.</p>
+        <input id="hjPinInput" type="text" class="hj-pin-input mono"
+          maxlength="6" placeholder="000000"
+          inputmode="numeric" pattern="[0-9]*" autocomplete="off" />
+        <div class="hj-actions">
+          <button class="btn secondary" id="hjCancelJoinBtn">Cancel</button>
+          <button class="btn" id="hjSubmitPinBtn">Join Game &rarr;</button>
+        </div>
+      </div>
+
+      <!-- Sub-view: waiting (joined, host hasn't started yet) -->
+      <div id="hjWaiting" style="display:none">
+        <div style="text-align:center; padding:8px 0;">
+          <div class="hj-waiting-icon">⏳</div>
+          <h3 style="margin:8px 0 4px; color:var(--wood2);">Waiting for host to start…</h3>
+          <p id="hjWaitingName" class="hj-subtitle"></p>
+        </div>
+        <div class="hj-divider"></div>
+        <div style="text-align:right">
+          <button class="btn secondary" id="hjLeaveBtn">Leave lobby</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Player View (placeholder for non-host players once game starts) -->
+  <div id="playerView" class="hj-screen" style="display:none">
+    <div class="login-card" style="text-align:center">
+      <div class="login-logo" style="font-size:48px; margin-bottom:10px;">🎲</div>
+      <h2 style="color:var(--wood2); margin:0 0 6px; font-size:22px;">Game in Progress</h2>
+      <p class="hj-subtitle">
+        You are playing as <strong id="pvPlayerName"></strong>
+      </p>
+      <div class="login-divider"></div>
+      <p style="font-size:12px; opacity:.5; font-weight:700; margin:0 0 20px;">
+        Full mobile view coming in a future update.
+      </p>
+      <button class="btn secondary" id="pvLeaveBtn">Leave game</button>
+    </div>
+  </div>
+
   <div class="wrap" id="mainApp" style="display:none">
     <!-- Header -->
     <div class="header">
@@ -349,7 +446,7 @@
     // Import Firebase modules
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
     import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-    import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, orderBy, limit, runTransaction } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+    import { getFirestore, doc, setDoc, getDoc, addDoc, collection, query, where, getDocs, orderBy, limit, runTransaction, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
     // Import our config
     import { firebaseConfig } from './js/firebase-config.js';
@@ -360,10 +457,13 @@
     window.firebaseAuth = getAuth(app);
     window.firebaseDb = getFirestore(app);
     window.firebaseAuthMethods = { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut };
-    window.firestoreMethods = { doc, setDoc, getDoc, collection, query, where, getDocs, orderBy, limit, runTransaction };
+    window.firestoreMethods = { doc, setDoc, getDoc, addDoc, collection, query, where, getDocs, orderBy, limit, runTransaction, onSnapshot };
     
     console.log('Firebase initialized!');
   </script>
+
+  <!-- QR Code library (used by host/join screen) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <!-- JavaScript Files -->
   <script src="js/config.js"></script>
@@ -372,6 +472,7 @@
   <script src="js/ui.js"></script>
   <script src="js/dice.js"></script>
   <script src="js/firestore-profiles.js"></script>
+  <script src="js/lobby.js"></script>
   <script src="js/firebase-auth.js"></script>
   <script src="js/firebase-firestore.js"></script>
   <script src="js/app.js"></script>

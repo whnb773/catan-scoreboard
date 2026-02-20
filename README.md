@@ -10,6 +10,8 @@ A digital scoreboard for Settlers of Catan with cloud sync, player profiles, and
 - **Undo/redo** — full undo history (150 steps)
 - **Backup & restore** — export/import JSON backups, local snapshots
 - **Google Sign-In** — full-page login screen gates access; signs in via Firebase Auth
+- **Host/Join flow** — host creates lobby with 6-digit PIN + QR code; players join by PIN; realtime lobby list; host starts game for all
+- **Three-screen app** — Login → Host/Join → Game Panel (or Player View for non-hosts)
 - **Cloud sync** — active game state saved to Firestore per user
 - **Player profiles** — aggregate stats (games, wins, streaks, VP, avg margin)
 - **Game setup modal** — search and select registered players before starting; guest slots supported
@@ -39,9 +41,10 @@ js/
   ui.js             DOM rendering (players, scores, photos)
   dice.js           Roll logic, turn tracking, charts
   firestore-profiles.js  User profiles, leaderboard, player search, stats
-  firebase-auth.js  Google Sign-In, auth state, profile caching
+  lobby.js          Host/Join lobby CRUD + real-time Firestore listener
+  firebase-auth.js  Google Sign-In, auth state, screen routing (showScreen)
   firebase-firestore.js  Live game sync, game record saving
-  app.js            Init, event wiring, setup modal, profile/leaderboard tabs
+  app.js            Init, event wiring, host/join UI, setup modal, profile/leaderboard tabs
   firebase-config.js     (git-ignored) Firebase project credentials
 ```
 
@@ -53,6 +56,7 @@ js/
 | `users/{uid}/games/current` | — | Live game state (full exportState snapshot) |
 | `users/{uid}/meta/gameRefs` | — | Array of last 20 game IDs |
 | `games/{gameId}` | — | Completed game record: players, scores, winner, duration, ruleset |
+| `lobbies/{lobbyId}` | — | pin, createdAt, hostUid, status (waiting/active/ended), players array |
 
 ## Setup (local dev)
 
@@ -70,11 +74,21 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if request.auth != null;
       allow write: if request.auth.uid == uid;
+      match /{subcollection=**} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == uid;
+      }
     }
     match /games/{gameId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update, delete: if request.auth.uid == resource.data.hostUid;
+    }
+    match /lobbies/{lobbyId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth.uid == resource.data.hostUid;
     }
   }
 }

@@ -471,6 +471,228 @@ function clearHistory() {
 }
 
 // =============================================================
+// HOST / JOIN SCREEN
+// =============================================================
+
+let _hjLobbyId  = null;   // active lobby doc ID
+let _hjLobbyUnsub = null; // real-time listener unsubscribe fn
+let _hjIsHost   = false;  // true when this client created the lobby
+
+// Show one sub-view within the host/join screen
+function showHostJoinView(view) {
+  ['hjChoose', 'hjHosting', 'hjJoining', 'hjWaiting'].forEach(id => {
+    const el = qs('#' + id);
+    if (el) el.style.display = id === view ? 'block' : 'none';
+  });
+}
+
+// Show the "continue saved game" link if local state exists
+function checkForSavedGame() {
+  const saved = loadState();
+  const wrap = qs('#hjContinueWrap');
+  if (wrap) wrap.style.display = saved ? 'block' : 'none';
+}
+
+// Clean up listener and lobby tracking state
+function cleanupLobby() {
+  if (_hjLobbyUnsub) { _hjLobbyUnsub(); _hjLobbyUnsub = null; }
+  _hjLobbyId = null;
+  _hjIsHost  = false;
+}
+
+// ─── HOST ─────────────────────────────────────────────────────
+
+async function startHosting() {
+  const user = getCurrentUser();
+  if (!user) return;
+
+  const btn = qs('#hjHostBtn');
+  btn.disabled = true;
+  btn.textContent = 'Creating lobby…';
+
+  try {
+    const { id, pin } = await createLobby(user);
+    _hjLobbyId = id;
+    _hjIsHost  = true;
+
+    showHostJoinView('hjHosting');
+    qs('#hjPinDisplay').textContent = pin;
+
+    // QR code (encodes just the PIN so joiners can scan → type it)
+    const qrContainer = qs('#hjQrCode');
+    qrContainer.innerHTML = '';
+    if (typeof QRCode !== 'undefined') {
+      new QRCode(qrContainer, {
+        text: pin,
+        width: 128, height: 128,
+        colorDark: '#3b2616', colorLight: '#f6edd8'
+      });
+    }
+
+    // Live player list
+    _hjLobbyUnsub = listenToLobby(id, lobby => {
+      renderLobbyPlayers(lobby.players);
+      if (lobby.status === 'ended') {
+        cleanupLobby();
+        showHostJoinView('hjChoose');
+      }
+    });
+
+  } catch (err) {
+    console.error('createLobby error:', err);
+    showToast('Failed to create lobby: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '🏠\u00a0 Host a Game';
+  }
+}
+
+function renderLobbyPlayers(lobbyPlayers) {
+  const container = qs('#hjLobbyPlayers');
+  if (!container) return;
+  if (!lobbyPlayers || lobbyPlayers.length === 0) {
+    container.innerHTML = '<div class="hj-lobby-empty">Waiting for players to join…</div>';
+    return;
+  }
+  container.innerHTML = lobbyPlayers.map(p => `
+    <div class="hj-lobby-player">
+      <div class="setup-avatar setup-avatar-sm" style="flex-shrink:0">
+        ${p.avatarUrl
+          ? `<img src="${escapeAttr(p.avatarUrl)}" alt="" onerror="this.style.display='none'">`
+          : (p.displayName || '?').slice(0, 2).toUpperCase()}
+      </div>
+      <span>${escapeHTML(p.displayName)}</span>
+      ${p.isHost ? '<span class="hj-host-tag">Host</span>' : ''}
+    </div>
+  `).join('');
+}
+
+async function cancelHosting() {
+  if (_hjLobbyId) {
+    try { await endLobby(_hjLobbyId); } catch (e) { console.warn(e); }
+  }
+  cleanupLobby();
+  showHostJoinView('hjChoose');
+}
+
+async function hostStartGame() {
+  if (!_hjLobbyId) return;
+
+  const btn = qs('#hjStartGameBtn');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+
+  try {
+    // Fetch current lobby players and apply to game state
+    const { doc, getDoc } = window.firestoreMethods;
+    const snap = await getDoc(doc(window.firebaseDb, 'lobbies', _hjLobbyId));
+    if (snap.exists()) {
+      const lobbyPlayers = snap.data().players;
+      for (let i = 0; i < Math.min(lobbyPlayers.length, 4); i++) {
+        const p = lobbyPlayers[i];
+        players[i].name = p.displayName;
+        players[i].uid  = p.uid;
+        if (!players[i].photo && p.avatarUrl) players[i].photo = p.avatarUrl;
+      }
+    }
+
+    // Mark lobby active → triggers joined players' listeners
+    await startLobbyGame(_hjLobbyId);
+
+    cleanupLobby();
+    showScreen('game');
+    startTimer();
+    renderAll();
+    saveAll();
+    showToast('Game started!', 'success');
+
+  } catch (err) {
+    console.error('hostStartGame error:', err);
+    showToast('Failed to start game: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Start Game →';
+  }
+}
+
+// ─── JOIN ─────────────────────────────────────────────────────
+
+function showJoinView() {
+  showHostJoinView('hjJoining');
+  const input = qs('#hjPinInput');
+  if (input) { input.value = ''; input.focus(); }
+}
+
+async function submitPin() {
+  const raw = (qs('#hjPinInput')?.value || '').trim();
+  if (!/^\d{6}$/.test(raw)) {
+    showToast('Enter a 6-digit PIN', 'error');
+    return;
+  }
+
+  const btn = qs('#hjSubmitPinBtn');
+  btn.disabled = true;
+  btn.textContent = 'Joining…';
+
+  try {
+    const lobby = await findLobbyByPin(raw);
+    if (!lobby) {
+      showToast('PIN not found or expired', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Join Game →';
+      return;
+    }
+
+    const user = getCurrentUser();
+    await joinLobby(lobby.id, user);
+    _hjLobbyId = lobby.id;
+    _hjIsHost  = false;
+
+    const myEntry = lobby.players.find(p => p.uid === user.uid);
+    const myName  = myEntry?.displayName || user.displayName || user.email;
+    const nameEl  = qs('#hjWaitingName');
+    if (nameEl) nameEl.textContent = `You joined as ${myName}`;
+
+    showHostJoinView('hjWaiting');
+
+    // Listen for host starting the game
+    _hjLobbyUnsub = listenToLobby(lobby.id, updatedLobby => {
+      if (updatedLobby.status === 'active') {
+        const myData = updatedLobby.players.find(p => p.uid === user.uid);
+        const pvName = qs('#pvPlayerName');
+        if (pvName) pvName.textContent = myData?.displayName || user.displayName || user.email;
+        cleanupLobby();
+        showScreen('playerView');
+      } else if (updatedLobby.status === 'ended') {
+        showToast('Lobby was closed by the host', 'error');
+        cleanupLobby();
+        showHostJoinView('hjChoose');
+      }
+    });
+
+  } catch (err) {
+    console.error('submitPin error:', err);
+    showToast('Failed to join: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Join Game →';
+  }
+}
+
+async function leaveWaitingLobby() {
+  const user = getCurrentUser();
+  if (_hjLobbyId && user) {
+    try { await leavePlayerFromLobby(_hjLobbyId, user.uid); } catch (e) { console.warn(e); }
+  }
+  cleanupLobby();
+  showHostJoinView('hjChoose');
+}
+
+// ─── PLAYER VIEW ──────────────────────────────────────────────
+
+function leavePlayerView() {
+  showScreen('hostjoin');
+  showHostJoinView('hjChoose');
+}
+
+// =============================================================
 // GAME SETUP MODAL
 // =============================================================
 
@@ -909,10 +1131,31 @@ function init() {
     if (e.target === qs("#setupModal")) closeSetupModal();
   });
 
-  // Firebase auth buttons
+  // Firebase auth buttons (login screen + game panel header)
   qs("#loginBtn").addEventListener("click", signInWithGoogle);
   qs("#logoutBtn").addEventListener("click", signOutUser);
   qs("#landingSignInBtn").addEventListener("click", signInWithGoogle);
+
+  // Host/join screen buttons
+  qs("#hjHostBtn").addEventListener("click", startHosting);
+  qs("#hjJoinBtn").addEventListener("click", showJoinView);
+  qs("#hjContinueBtn").addEventListener("click", () => showScreen('game'));
+  qs("#hjSignOutBtn").addEventListener("click", signOutUser);
+
+  // Hosting sub-view
+  qs("#hjCancelHostBtn").addEventListener("click", cancelHosting);
+  qs("#hjStartGameBtn").addEventListener("click", hostStartGame);
+
+  // Joining sub-view
+  qs("#hjCancelJoinBtn").addEventListener("click", () => showHostJoinView('hjChoose'));
+  qs("#hjSubmitPinBtn").addEventListener("click", submitPin);
+  qs("#hjPinInput").addEventListener("keydown", e => { if (e.key === "Enter") submitPin(); });
+
+  // Waiting sub-view
+  qs("#hjLeaveBtn").addEventListener("click", leaveWaitingLobby);
+
+  // Player view (non-host)
+  qs("#pvLeaveBtn").addEventListener("click", leavePlayerView);
 
   // Initialize Firebase auth
   if (window.firebaseAuth) {

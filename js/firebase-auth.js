@@ -1,12 +1,36 @@
 /* =============================================
    FIREBASE AUTHENTICATION
-   Handle Google Sign-In
+   Handle Google Sign-In and screen routing
    ============================================= */
 
 let currentUser = null;
 let currentUserProfile = null;
 
-// Initialize auth state listener
+// ─── SCREEN ROUTING ───────────────────────────────────────────
+
+// Show exactly one top-level screen; hide the rest.
+// 'game' clears the inline style so CSS display:grid on .wrap kicks in.
+function showScreen(name) {
+  const map = {
+    login:      qs('#loginScreen'),
+    hostjoin:   qs('#hostJoinScreen'),
+    game:       qs('#mainApp'),
+    playerView: qs('#playerView')
+  };
+  Object.keys(map).forEach(key => {
+    const el = map[key];
+    if (!el) return;
+    el.style.display = key === name ? (key === 'game' ? '' : 'flex') : 'none';
+  });
+
+  // Redraw canvas charts once the game panel is actually visible
+  if (name === 'game' && typeof drawCharts === 'function') {
+    requestAnimationFrame(() => drawCharts());
+  }
+}
+
+// ─── AUTH STATE ───────────────────────────────────────────────
+
 function initAuth() {
   const { onAuthStateChanged } = window.firebaseAuthMethods;
   const auth = window.firebaseAuth;
@@ -17,14 +41,16 @@ function initAuth() {
 
     if (user) {
       console.log('User signed in:', user.email);
-      // Ensure profile doc exists and cache it
       await ensureUserProfile(user);
       currentUserProfile = await getUserProfile(user.uid);
-      showToast(`Welcome ${user.displayName}!`, 'success');
+      showToast(`Welcome ${user.displayName || user.email}!`, 'success');
       loadUserData();
     } else {
       console.log('User signed out');
       currentUserProfile = null;
+      // Clean up any active lobby and reset sub-view
+      if (typeof cleanupLobby === 'function') cleanupLobby();
+      if (typeof showHostJoinView === 'function') showHostJoinView('hjChoose');
       const s = loadState();
       if (s) importState(s);
       renderAll();
@@ -32,52 +58,55 @@ function initAuth() {
   });
 }
 
-// Update UI based on auth state
+// ─── UI UPDATE ────────────────────────────────────────────────
+
 function updateAuthUI(user) {
   const notLoggedIn = qs('#notLoggedIn');
-  const loggedIn = qs('#loggedIn');
-  const loginScreen = qs('#loginScreen');
-  const mainApp = qs('#mainApp');
+  const loggedIn    = qs('#loggedIn');
 
   if (user) {
-    // Hide login screen, reveal app
-    if (loginScreen) loginScreen.style.display = 'none';
-    if (mainApp) mainApp.style.display = '';
+    // Route signed-in users to host/join, not directly to game panel
+    showScreen('hostjoin');
 
-    // Show logged-in header state
-    notLoggedIn.style.display = 'none';
-    loggedIn.style.display = 'flex';
-
-    qs('#userName').textContent = user.displayName || user.email;
-    qs('#userPhoto').src = user.photoURL || '';
-
-    // Admin badge
+    // Game-panel header
+    if (notLoggedIn) notLoggedIn.style.display = 'none';
+    if (loggedIn)    loggedIn.style.display = 'flex';
+    const el = qs('#userName');
+    if (el) el.textContent = user.displayName || user.email;
+    const ph = qs('#userPhoto');
+    if (ph) ph.src = user.photoURL || '';
     const badge = qs('#adminBadge');
-    if (badge) {
-      badge.style.display = (ADMIN_EMAILS || []).includes(user.email) ? 'inline' : 'none';
-    }
-  } else {
-    // Show login screen, hide app
-    if (loginScreen) loginScreen.style.display = 'flex';
-    if (mainApp) mainApp.style.display = 'none';
+    if (badge) badge.style.display = (ADMIN_EMAILS || []).includes(user.email) ? 'inline' : 'none';
 
-    // Show not-logged-in header state
-    notLoggedIn.style.display = 'flex';
-    loggedIn.style.display = 'none';
+    // Host/join screen header
+    const hjPhoto = qs('#hjUserPhoto');
+    const hjName  = qs('#hjUserName');
+    const hjBadge = qs('#hjAdminBadge');
+    if (hjPhoto) hjPhoto.src = user.photoURL || '';
+    if (hjName)  hjName.textContent = user.displayName || user.email;
+    if (hjBadge) hjBadge.style.display = (ADMIN_EMAILS || []).includes(user.email) ? 'inline' : 'none';
+
+    // Show "continue saved game" link if there's local state
+    if (typeof checkForSavedGame === 'function') checkForSavedGame();
+
+  } else {
+    showScreen('login');
+    if (notLoggedIn) notLoggedIn.style.display = 'flex';
+    if (loggedIn)    loggedIn.style.display = 'none';
   }
 }
 
-// Sign in with Google
+// ─── SIGN IN / OUT ────────────────────────────────────────────
+
 async function signInWithGoogle() {
   const { signInWithPopup, GoogleAuthProvider } = window.firebaseAuthMethods;
   const auth = window.firebaseAuth;
   const provider = new GoogleAuthProvider();
-  
+
   try {
     const result = await signInWithPopup(auth, provider);
-    const user = result.user;
-    console.log('Signed in:', user.email);
-    return user;
+    console.log('Signed in:', result.user.email);
+    return result.user;
   } catch (error) {
     console.error('Sign in error:', error);
     showToast('Sign in failed: ' + error.message, 'error');
@@ -85,62 +114,53 @@ async function signInWithGoogle() {
   }
 }
 
-// Sign out
 async function signOutUser() {
   const { signOut } = window.firebaseAuthMethods;
   const auth = window.firebaseAuth;
-  
+
   try {
     await signOut(auth);
-    console.log('Signed out');
     showToast('Signed out successfully', 'success');
-    
-    // Clear local state
-    renderAll();
   } catch (error) {
     console.error('Sign out error:', error);
     showToast('Sign out failed: ' + error.message, 'error');
   }
 }
 
-// Get current user
+// ─── ACCESSORS ────────────────────────────────────────────────
+
 function getCurrentUser() {
   return currentUser;
 }
 
-// Get current user's cached Firestore profile
 function getCurrentUserProfile() {
   return currentUserProfile;
 }
 
-// Refresh the cached profile (call after stat updates)
 async function refreshCurrentUserProfile() {
   if (!currentUser) return null;
   currentUserProfile = await getUserProfile(currentUser.uid);
   return currentUserProfile;
 }
 
-// Load user data from Firestore
+// ─── DATA LOADING ─────────────────────────────────────────────
+
 async function loadUserData() {
   console.log('Loading user data from Firestore...');
-  
-  // Try to load from Firestore
+
   const firestoreData = await loadFromFirestore();
-  
+
   if (firestoreData) {
-    // Found cloud data, use it
     importState(firestoreData);
     showToast('Game loaded from cloud', 'success');
   } else {
-    // No cloud data, check localStorage
     const localData = loadState();
     if (localData) {
       importState(localData);
-      // Save to cloud for next time
       await saveToFirestore();
       showToast('Local game uploaded to cloud', 'success');
     }
   }
-  
+
   renderAll();
 }
