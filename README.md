@@ -67,28 +67,46 @@ js/
 
 ## Required Firestore security rules
 
+Paste these into **Firebase Console → Firestore Database → Rules**. Update the email addresses in `isAdmin()` to match the `ADMIN_EMAILS` list in `js/config.js`.
+
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Admins can read/write anything
+    function isAdmin() {
+      return request.auth != null &&
+        request.auth.token.email in [
+          'your-admin@email.com',
+          'your-other-admin@email.com'
+        ];
+    }
+
+    // User profiles and all subcollections (games/current, meta/gameRefs, etc.)
     match /users/{uid} {
       allow read: if request.auth != null;
-      allow write: if request.auth.uid == uid;
+      allow write: if request.auth.uid == uid || isAdmin();
+
       match /{subcollection=**} {
         allow read: if request.auth != null;
-        allow write: if request.auth.uid == uid;
+        allow write: if request.auth.uid == uid || isAdmin();
       }
     }
+
+    // Completed game records
     match /games/{gameId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth.uid == resource.data.hostUid;
+      allow update, delete: if request.auth.uid == resource.data.hostUid || isAdmin();
     }
+
+    // Game lobbies (Host/Join flow)
     match /lobbies/{lobbyId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update: if request.auth != null;
-      allow delete: if request.auth.uid == resource.data.hostUid;
+      allow delete: if request.auth.uid == resource.data.hostUid || isAdmin();
     }
   }
 }
