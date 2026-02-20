@@ -912,6 +912,7 @@ function init() {
   // Firebase auth buttons
   qs("#loginBtn").addEventListener("click", signInWithGoogle);
   qs("#logoutBtn").addEventListener("click", signOutUser);
+  qs("#landingSignInBtn").addEventListener("click", signInWithGoogle);
 
   // Initialize Firebase auth
   if (window.firebaseAuth) {

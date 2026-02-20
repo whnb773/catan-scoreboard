@@ -44,3 +44,9 @@ const PHOTO_QUALITY = 0.86; // JPEG quality
 // Timing
 const TOAST_DURATION = 4500; // milliseconds
 const DICE_OVERLAY_DURATION = 1500; // milliseconds
+
+// Admin emails (granted Admin badge in UI)
+const ADMIN_EMAILS = [
+  'conor.doherty@cctech.com.au',
+  'conordoherty92@gmail.com'
+];

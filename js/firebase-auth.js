@@ -36,16 +36,32 @@ function initAuth() {
 function updateAuthUI(user) {
   const notLoggedIn = qs('#notLoggedIn');
   const loggedIn = qs('#loggedIn');
-  
+  const loginScreen = qs('#loginScreen');
+  const mainApp = qs('#mainApp');
+
   if (user) {
-    // Show logged in state
+    // Hide login screen, reveal app
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (mainApp) mainApp.style.display = '';
+
+    // Show logged-in header state
     notLoggedIn.style.display = 'none';
     loggedIn.style.display = 'flex';
-    
+
     qs('#userName').textContent = user.displayName || user.email;
     qs('#userPhoto').src = user.photoURL || '';
+
+    // Admin badge
+    const badge = qs('#adminBadge');
+    if (badge) {
+      badge.style.display = (ADMIN_EMAILS || []).includes(user.email) ? 'inline' : 'none';
+    }
   } else {
-    // Show not logged in state
+    // Show login screen, hide app
+    if (loginScreen) loginScreen.style.display = 'flex';
+    if (mainApp) mainApp.style.display = 'none';
+
+    // Show not-logged-in header state
     notLoggedIn.style.display = 'flex';
     loggedIn.style.display = 'none';
   }

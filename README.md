@@ -9,7 +9,7 @@ A digital scoreboard for Settlers of Catan with cloud sync, player profiles, and
 - **Timer & rounds** — game timer with pause/resume and optional round counter
 - **Undo/redo** — full undo history (150 steps)
 - **Backup & restore** — export/import JSON backups, local snapshots
-- **Google Sign-In** — optional authentication via Firebase Auth
+- **Google Sign-In** — full-page login screen gates access; signs in via Firebase Auth
 - **Cloud sync** — active game state saved to Firestore per user
 - **Player profiles** — aggregate stats (games, wins, streaks, VP, avg margin)
 - **Game setup modal** — search and select registered players before starting; guest slots supported
@@ -33,7 +33,7 @@ css/
   components.css    Buttons, cards, modals, player slots, etc.
   animations.css    Dice, confetti, transitions
 js/
-  config.js         Constants (storage keys, colours, timing)
+  config.js         Constants (storage keys, colours, timing, admin email list)
   state.js          Global state + helper functions
   storage.js        localStorage save/load, undo/redo, export/import
   ui.js             DOM rendering (players, scores, photos)
@@ -59,6 +59,7 @@ js/
 1. Copy `js/firebase-config.example.js` → `js/firebase-config.js` and fill in your Firebase credentials
 2. Open `index.html` with Live Server (VS Code) or any static file server
 3. Set Firestore security rules in the Firebase Console (see below)
+4. Update the `ADMIN_EMAILS` array in `js/config.js` with the email addresses that should receive the Admin badge
 
 ## Required Firestore security rules
 
