@@ -762,3 +762,172 @@ tr:last-child td {
 .toast.error {
   background: var(--accent);
 }
+
+/* =============================================================
+   GAME SETUP MODAL
+   ============================================================= */
+
+.setup-modal {
+  max-width: 680px;
+}
+
+#setupSlots {
+  display: grid;
+  gap: 10px;
+}
+
+.setup-slot {
+  background: rgba(255,255,255,.55);
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.setup-slot-filled {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.setup-slot-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.setup-slot-label {
+  font-size: 12px;
+  font-weight: 900;
+  opacity: .6;
+  min-width: 56px;
+}
+
+.setup-slot-info {
+  flex: 1;
+}
+
+.setup-slot-name {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.setup-slot-meta {
+  font-size: 11px;
+  opacity: .6;
+  font-weight: 700;
+}
+
+/* Shared avatar circle */
+.setup-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--wood);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 2px solid rgba(255,255,255,.3);
+  position: relative;
+}
+
+.setup-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  position: absolute;
+  inset: 0;
+}
+
+.setup-avatar-sm {
+  width: 32px;
+  height: 32px;
+  font-size: 11px;
+}
+
+.setup-avatar-lg {
+  width: 64px;
+  height: 64px;
+  font-size: 20px;
+}
+
+.setup-colour-select {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,.18);
+  background: rgba(255,255,255,.9);
+  font-weight: 900;
+  font-size: 12px;
+}
+
+/* Search within a slot */
+.setup-slot-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 160px;
+}
+
+.setup-search-input {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,.18);
+  background: rgba(255,255,255,.85);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.setup-search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--paper);
+  border: 1px solid rgba(0,0,0,.15);
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.15);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.setup-search-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.setup-search-item:hover {
+  background: rgba(0,0,0,.06);
+}
+
+.setup-search-no-results {
+  padding: 10px 12px;
+  font-size: 12px;
+  opacity: .6;
+  font-weight: 700;
+}
+
+/* =============================================================
+   PROFILE TAB
+   ============================================================= */
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.profile-name-wrap {
+  flex: 1;
+}

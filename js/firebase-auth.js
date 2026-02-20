@@ -4,24 +4,27 @@
    ============================================= */
 
 let currentUser = null;
+let currentUserProfile = null;
 
 // Initialize auth state listener
 function initAuth() {
   const { onAuthStateChanged } = window.firebaseAuthMethods;
   const auth = window.firebaseAuth;
-  
-  onAuthStateChanged(auth, (user) => {
+
+  onAuthStateChanged(auth, async (user) => {
     currentUser = user;
     updateAuthUI(user);
-    
+
     if (user) {
       console.log('User signed in:', user.email);
+      // Ensure profile doc exists and cache it
+      await ensureUserProfile(user);
+      currentUserProfile = await getUserProfile(user.uid);
       showToast(`Welcome ${user.displayName}!`, 'success');
-      // Load user's data from Firestore
       loadUserData();
     } else {
       console.log('User signed out');
-      // Load from localStorage as backup
+      currentUserProfile = null;
       const s = loadState();
       if (s) importState(s);
       renderAll();
@@ -87,6 +90,18 @@ async function signOutUser() {
 // Get current user
 function getCurrentUser() {
   return currentUser;
+}
+
+// Get current user's cached Firestore profile
+function getCurrentUserProfile() {
+  return currentUserProfile;
+}
+
+// Refresh the cached profile (call after stat updates)
+async function refreshCurrentUserProfile() {
+  if (!currentUser) return null;
+  currentUserProfile = await getUserProfile(currentUser.uid);
+  return currentUserProfile;
 }
 
 // Load user data from Firestore

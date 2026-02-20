@@ -196,6 +196,8 @@ function setSettingsTab(tab) {
   qsa(".settings-content").forEach(c => c.classList.remove("active"));
   qs(`[data-settings-tab="${tab}"]`)?.classList.add("active");
   qs(`#settings-${tab}`)?.classList.add("active");
+  if (tab === "profile") renderProfileTab();
+  if (tab === "leaderboard") renderLeaderboard();
 }
 
 // History rendering
@@ -312,6 +314,15 @@ function finalizeEndGame() {
   saveAll();
   renderHistory();
   closeEndConfirm();
+
+  // Fire-and-forget cloud game record
+  const user = getCurrentUser();
+  if (user) {
+    saveGameRecord(p, players, {
+      ruleset: getRuleset(),
+      winningPoints: Number(qs("#winPoints")?.value || 10)
+    }).catch(err => console.error('saveGameRecord failed:', err));
+  }
 
   showVictory(p.winnerIdx, p.margin, p.scores);
 }
@@ -459,6 +470,307 @@ function clearHistory() {
   );
 }
 
+// =============================================================
+// GAME SETUP MODAL
+// =============================================================
+
+// Per-slot state for the setup modal: array of 4 { uid, displayName, avatarUrl, colourPref } | null
+let setupSlotData = [null, null, null, null];
+let setupSearchTimers = [null, null, null, null];
+
+function openSetupModal() {
+  setupSlotData = [null, null, null, null];
+
+  // Pre-fill slot 0 with the logged-in user's profile
+  const profile = typeof getCurrentUserProfile === 'function' ? getCurrentUserProfile() : null;
+  const user = getCurrentUser();
+  if (profile) {
+    setupSlotData[0] = { uid: user.uid, displayName: profile.displayName, avatarUrl: profile.avatarUrl, colourPref: profile.colourPref };
+  } else if (user) {
+    setupSlotData[0] = { uid: user.uid, displayName: user.displayName || user.email, avatarUrl: user.photoURL || '', colourPref: '#1f6bd6' };
+  }
+
+  renderSetupSlots();
+  qs("#setupModal").classList.add("active");
+}
+
+function closeSetupModal() {
+  qs("#setupModal").classList.remove("active");
+}
+
+function renderSetupSlots() {
+  const container = qs("#setupSlots");
+  container.innerHTML = "";
+  for (let i = 0; i < 4; i++) {
+    container.appendChild(buildSetupSlot(i));
+  }
+}
+
+function buildSetupSlot(i) {
+  const d = setupSlotData[i];
+  const isHost = i === 0;
+  const colourOpts = COLOR_OPTIONS.map(c =>
+    `<option value="${c.hex}" ${d?.colourPref === c.hex ? 'selected' : ''}>${c.name || c.hex}</option>`
+  ).join('');
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "setup-slot";
+  wrapper.dataset.slot = i;
+
+  if (d) {
+    // Filled slot — show avatar + name + colour + clear button
+    const initials = (d.displayName || '?').slice(0, 2).toUpperCase();
+    wrapper.innerHTML = `
+      <div class="setup-slot-filled">
+        <div class="setup-avatar" style="background:${d.colourPref || '#ccc'}">
+          ${d.avatarUrl ? `<img src="${escapeAttr(d.avatarUrl)}" alt="" onerror="this.style.display='none'">` : initials}
+        </div>
+        <div class="setup-slot-info">
+          <div class="setup-slot-name">${escapeHTML(d.displayName)}</div>
+          <div class="setup-slot-meta">${isHost ? 'Host' : 'Player ' + (i + 1)}</div>
+        </div>
+        <select class="setup-colour-select" data-slot="${i}" aria-label="Colour">${colourOpts}</select>
+        ${isHost ? '' : `<button class="btn secondary setup-clear-btn" data-slot="${i}" style="padding:4px 10px;font-size:12px;">✕</button>`}
+      </div>
+    `;
+  } else {
+    // Empty slot — show search input + guest button
+    wrapper.innerHTML = `
+      <div class="setup-slot-empty">
+        <div class="setup-slot-label">Player ${i + 1}</div>
+        <div class="setup-slot-search-wrap">
+          <input type="text" class="setup-search-input" data-slot="${i}" placeholder="Search by name…" autocomplete="off" />
+          <div class="setup-search-results" data-slot="${i}" style="display:none;"></div>
+        </div>
+        <button class="btn secondary setup-guest-btn" data-slot="${i}" style="padding:4px 10px;font-size:12px;">Guest</button>
+      </div>
+    `;
+  }
+
+  // Attach event handlers
+  if (d) {
+    if (!isHost) {
+      wrapper.querySelector('.setup-clear-btn')?.addEventListener('click', () => {
+        setupSlotData[i] = null;
+        renderSetupSlots();
+      });
+    }
+    wrapper.querySelector('.setup-colour-select')?.addEventListener('change', (e) => {
+      setupSlotData[i].colourPref = e.target.value;
+    });
+  } else {
+    const input = wrapper.querySelector('.setup-search-input');
+    const resultsEl = wrapper.querySelector('.setup-search-results');
+
+    input?.addEventListener('input', () => {
+      clearTimeout(setupSearchTimers[i]);
+      const q = input.value.trim();
+      if (q.length < 1) { resultsEl.style.display = 'none'; return; }
+      setupSearchTimers[i] = setTimeout(async () => {
+        const results = await searchUsers(q);
+        if (results.length === 0) {
+          resultsEl.innerHTML = '<div class="setup-search-no-results">No players found</div>';
+        } else {
+          resultsEl.innerHTML = results.map(r => `
+            <div class="setup-search-item" data-uid="${escapeAttr(r.uid)}"
+              data-name="${escapeAttr(r.displayName)}"
+              data-avatar="${escapeAttr(r.avatarUrl || '')}"
+              data-colour="${escapeAttr(r.colourPref || '#1f6bd6')}">
+              <div class="setup-avatar setup-avatar-sm" style="background:${r.colourPref || '#ccc'}">
+                ${r.avatarUrl ? `<img src="${escapeAttr(r.avatarUrl)}" alt="" onerror="this.style.display='none'">` : (r.displayName || '?').slice(0, 2).toUpperCase()}
+              </div>
+              <span>${escapeHTML(r.displayName)}</span>
+            </div>
+          `).join('');
+        }
+        resultsEl.style.display = 'block';
+
+        resultsEl.querySelectorAll('.setup-search-item').forEach(item => {
+          item.addEventListener('click', () => {
+            setupSlotData[i] = {
+              uid: item.dataset.uid,
+              displayName: item.dataset.name,
+              avatarUrl: item.dataset.avatar,
+              colourPref: item.dataset.colour
+            };
+            renderSetupSlots();
+          });
+        });
+      }, 300);
+    });
+
+    wrapper.querySelector('.setup-guest-btn')?.addEventListener('click', () => {
+      setupSlotData[i] = { uid: null, displayName: 'Guest ' + (i + 1), avatarUrl: '', colourPref: COLOR_OPTIONS[i % COLOR_OPTIONS.length].hex };
+      renderSetupSlots();
+    });
+  }
+
+  return wrapper;
+}
+
+function confirmSetup() {
+  snapshot("Game setup");
+
+  // Apply slot data to players array
+  for (let i = 0; i < 4; i++) {
+    const d = setupSlotData[i];
+    if (d) {
+      players[i].name = d.displayName;
+      players[i].color = d.colourPref;
+      players[i].uid = d.uid || null;
+      // Only set avatar as photo if no existing player photo
+      if (!players[i].photo && d.avatarUrl) {
+        players[i].photo = d.avatarUrl;
+      }
+    }
+  }
+
+  saveAll();
+  renderAll();
+  closeSetupModal();
+  startTimer();
+  showToast("Game started!", "success");
+}
+
+// =============================================================
+// PROFILE TAB
+// =============================================================
+
+async function renderProfileTab() {
+  const el = qs("#profileContent");
+  const user = getCurrentUser();
+
+  if (!user) {
+    el.innerHTML = '<div class="small" style="font-weight:900; opacity:.6;">Sign in to view your profile.</div>';
+    return;
+  }
+
+  el.innerHTML = '<div class="small" style="opacity:.6;">Loading…</div>';
+
+  const [profile, games] = await Promise.all([
+    getUserProfile(user.uid),
+    getUserGames(user.uid)
+  ]);
+
+  if (!profile) {
+    el.innerHTML = '<div class="small" style="font-weight:900; opacity:.6;">Profile not found.</div>';
+    return;
+  }
+
+  const winRate = profile.totalGames > 0
+    ? Math.round((profile.totalWins / profile.totalGames) * 100)
+    : 0;
+
+  const initials = (profile.displayName || '?').slice(0, 2).toUpperCase();
+  const avatarHtml = profile.avatarUrl
+    ? `<img src="${escapeAttr(profile.avatarUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.style.display='none'">`
+    : initials;
+
+  const gamesHtml = games.length === 0
+    ? '<tr><td colspan="5" class="small">No games yet.</td></tr>'
+    : games.map(g => {
+        const mySlot = g.players?.find(p => p.uid === user.uid);
+        const date = new Date(g.endedAt || g.startedAt || 0);
+        const result = mySlot?.isWinner ? '🏆 Win' : 'Loss';
+        return `<tr>
+          <td>${date.toLocaleDateString()}</td>
+          <td>${result}</td>
+          <td class="mono">${mySlot?.finalScore ?? '-'}</td>
+          <td class="mono">${g.margin || '-'}</td>
+          <td class="mono">${formatTime(g.durationMs || 0)}</td>
+        </tr>`;
+      }).join('');
+
+  el.innerHTML = `
+    <div class="profile-header">
+      <div class="setup-avatar setup-avatar-lg">${avatarHtml}</div>
+      <div class="profile-name-wrap">
+        <input id="profileDisplayName" type="text" value="${escapeAttr(profile.displayName)}"
+          style="font-size:16px;font-weight:900;padding:6px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.18);background:rgba(255,255,255,.8);width:100%;max-width:240px;" />
+        <div class="small" style="opacity:.6;margin-top:4px;">${escapeHTML(profile.email || '')}</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="stats-grid" style="margin-bottom:12px;">
+      <div class="statbox"><div class="label">Games</div><div class="value mono">${profile.totalGames}</div></div>
+      <div class="statbox"><div class="label">Wins</div><div class="value mono">${profile.totalWins}</div></div>
+      <div class="statbox"><div class="label">Win Rate</div><div class="value mono">${winRate}%</div></div>
+      <div class="statbox"><div class="label">Avg Margin</div><div class="value mono">${profile.avgMargin || 0}</div></div>
+      <div class="statbox"><div class="label">Best Streak</div><div class="value mono">${profile.winStreakLongest || 0}</div></div>
+      <div class="statbox"><div class="label">Total VP</div><div class="value mono">${profile.totalVP || 0}</div></div>
+    </div>
+    <div class="divider"></div>
+    <h4 style="margin:8px 0;">Recent Games</h4>
+    <table>
+      <thead><tr><th>Date</th><th>Result</th><th>Score</th><th>Margin</th><th>Duration</th></tr></thead>
+      <tbody>${gamesHtml}</tbody>
+    </table>
+  `;
+
+  // Save display name on blur
+  qs("#profileDisplayName")?.addEventListener("blur", async (e) => {
+    const newName = e.target.value.trim();
+    if (newName && newName !== profile.displayName) {
+      await updateDisplayName(user.uid, newName);
+      showToast("Name updated", "success");
+    }
+  });
+}
+
+// =============================================================
+// LEADERBOARD TAB
+// =============================================================
+
+async function renderLeaderboard() {
+  const el = qs("#leaderboardContent");
+  const user = getCurrentUser();
+
+  if (!user) {
+    el.innerHTML = '<div class="small" style="font-weight:900; opacity:.6;">Sign in to view the leaderboard.</div>';
+    return;
+  }
+
+  el.innerHTML = '<div class="small" style="opacity:.6;">Loading…</div>';
+
+  const leaders = await loadLeaderboard();
+
+  if (leaders.length === 0) {
+    el.innerHTML = '<div class="small" style="font-weight:900; opacity:.6;">No games recorded yet.</div>';
+    return;
+  }
+
+  const rows = leaders.map((p, idx) => {
+    const winRate = p.totalGames > 0 ? Math.round((p.totalWins / p.totalGames) * 100) : 0;
+    const initials = (p.displayName || '?').slice(0, 2).toUpperCase();
+    const avatarHtml = p.avatarUrl
+      ? `<img src="${escapeAttr(p.avatarUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.style.display='none'">`
+      : initials;
+    const lastSeen = p.lastSeen ? new Date(p.lastSeen).toLocaleDateString() : '-';
+    const isMe = p.uid === user.uid;
+    return `<tr${isMe ? ' style="font-weight:900;background:rgba(31,107,214,.08);"' : ''}>
+      <td class="mono">${idx + 1}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="setup-avatar setup-avatar-sm">${avatarHtml}</div>
+          ${escapeHTML(p.displayName)}${isMe ? ' (you)' : ''}
+        </div>
+      </td>
+      <td class="mono">${p.totalWins || 0}</td>
+      <td class="mono">${winRate}%</td>
+      <td class="mono">${p.avgMargin || 0}</td>
+      <td class="mono">${p.winStreakLongest || 0}</td>
+      <td class="mono">${lastSeen}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <table>
+      <thead><tr><th>#</th><th>Player</th><th>Wins</th><th>Win %</th><th>Avg ±</th><th>Streak</th><th>Last Played</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
 // Initialize app
 function init() {
   console.log("Catan Scoreboard initializing...");
@@ -478,10 +790,14 @@ function init() {
   // Event listeners - Header buttons
   qs("#startGameBtn").addEventListener("click", () => {
     if (paused) return;
-    snapshot("Start");
-    startTimer();
-    saveAll();
-    showToast("Timer started", "success");
+    if (window.firebaseAuth?.currentUser) {
+      openSetupModal();
+    } else {
+      snapshot("Start");
+      startTimer();
+      saveAll();
+      showToast("Timer started", "success");
+    }
   });
 
   qs("#pauseGameBtn").addEventListener("click", () => {
@@ -584,6 +900,13 @@ function init() {
     for (let i = 0; i < 4; i++) {
       if (players[i].photo) applyPhotoStyles(i);
     }
+  });
+
+  // Game setup modal
+  qs("#setupCancelBtn").addEventListener("click", closeSetupModal);
+  qs("#setupConfirmBtn").addEventListener("click", confirmSetup);
+  qs("#setupModal").addEventListener("click", (e) => {
+    if (e.target === qs("#setupModal")) closeSetupModal();
   });
 
   // Firebase auth buttons
