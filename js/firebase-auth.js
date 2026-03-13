@@ -152,7 +152,7 @@ async function loadUserData() {
 
   const firestoreData = await loadFromFirestore();
 
-  if (firestoreData) {
+  if (firestoreData && !firestoreData.gameEnded) {
     importState(firestoreData);
     showToast('Game loaded from cloud', 'success');
   } else {

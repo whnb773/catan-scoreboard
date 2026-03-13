@@ -30,17 +30,12 @@
   gap: 8px;
 }
 
-.header-left input[type="text"] {
-  border: none;
-  outline: none;
+.board-title-text {
   color: #fff;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.14);
-  border-radius: 12px;
-  padding: 8px 12px;
   font-weight: 900;
   font-size: 18px;
   letter-spacing: .3px;
+  padding: 8px 0;
 }
 
 .header-meta {

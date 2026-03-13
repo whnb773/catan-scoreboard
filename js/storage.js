@@ -17,6 +17,7 @@ function clearStaleLocalStorage() {
 function exportState() {
   return {
     appVersion: "v12_improved",
+    gameEnded,
     title: qs("#boardTitle")?.value || "Catan Scoreboard",
     winPoints: Number(qs("#winPoints")?.value || 10),
     autoWin: !!qs("#autoWin")?.checked,
@@ -76,7 +77,7 @@ function saveAll() {
 function importState(s) {
   if (!s) return;
 
-  if (typeof s.title === "string") qs("#boardTitle").value = s.title.slice(0, 100);
+  const boardTitleEl = qs("#boardTitle"); if (boardTitleEl && typeof s.title === "string") boardTitleEl.value = s.title.slice(0, 100);
   if (typeof s.winPoints === "number") qs("#winPoints").value = String(clamp(s.winPoints, 1, 50));
   if (typeof s.autoWin === "boolean") qs("#autoWin").checked = s.autoWin;
   if (typeof s.ruleset === "string") qs("#ruleset").value = (s.ruleset === "eap") ? "eap" : "base";

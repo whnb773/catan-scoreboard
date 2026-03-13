@@ -81,6 +81,9 @@ const redoStack = [];
 // Pending end game data
 let pendingEnd = null;
 
+// Set to true after a game is ended; cleared when new game starts
+let gameEnded = false;
+
 // Helper: Get ruleset
 function getRuleset() {
   return qs("#ruleset")?.value || "base";

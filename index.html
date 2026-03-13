@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Catan Scoreboard</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
   
@@ -13,6 +16,19 @@
   <link rel="stylesheet" href="css/animations.css">
 </head>
 <body>
+
+  <!-- Reset screen states immediately (guards against bfcache restoring stale DOM) -->
+  <script>
+    (function(){
+      var ids = ['hostJoinScreen','mainApp','playerView','profileScreen'];
+      for (var i=0; i<ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (el) el.style.display = 'none';
+      }
+      var login = document.getElementById('loginScreen');
+      if (login) login.style.display = '';
+    })();
+  </script>
 
   <!-- Login / Landing Screen -->
   <div id="loginScreen" class="login-screen">
@@ -148,7 +164,7 @@
     <!-- Header -->
     <div class="header">
       <div class="header-left">
-        <input id="boardTitle" type="text" value="Catan Scoreboard" aria-label="Board title" maxlength="100" />
+        <span class="board-title-text">Catan Scoreboard</span>
         <div class="header-meta">
           <div class="pill" style="padding:6px 10px;">
             <span style="font-weight:900; font-size:11px; opacity:.8;">Win:</span>

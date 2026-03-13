@@ -311,6 +311,7 @@ function finalizeEndGame() {
     durationMs: p.durationMs
   });
 
+  gameEnded = true;
   saveAll();
   renderHistory();
   closeEndConfirm();
@@ -387,8 +388,39 @@ function showVictory(winnerIdx, margin, finalScores) {
   createConfettiBurst();
 }
 
+function resetForNewGame() {
+  // Reset scores
+  for (let i = 0; i < 4; i++) {
+    playerState[i] = { settlements: 0, cities: 0, vpCards: 0, longestRoad: 0, largestArmy: 0, harbourSettlements: 0, harbourCities: 0, pirateLairs: 0, vpTokens: 0, specialVP: 0 };
+  }
+  // Reset timer
+  pauseTimerInternal();
+  paused = false;
+  elapsedMs = 0;
+  // Reset dice
+  for (let t = 2; t <= 12; t++) counts[t] = 0;
+  totalRolls = 0;
+  for (let i = 0; i < 4; i++) {
+    for (let t = 2; t <= 12; t++) playerRolls[i].counts[t] = 0;
+    playerRolls[i].total = 0;
+  }
+  rollLog.length = 0;
+  // Reset turn/round
+  turnIndex = 0;
+  roundCount = 1;
+  pendingEnd = null;
+  undoStack.length = 0;
+  redoStack.length = 0;
+  gameEnded = false;
+}
+
 function closeVictory() {
   qs("#victoryOverlay").classList.remove("active");
+  resetForNewGame();
+  saveAll();
+  renderAll();
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  showScreen(user ? 'hostjoin' : 'login');
 }
 
 // Backup/Export
@@ -1162,6 +1194,18 @@ async function renderProfileScreen() {
       if (hjPhoto) hjPhoto.src = result.dataUrl;
       const cached = getCurrentUserProfile();
       if (cached) cached.avatarUrl = result.dataUrl;
+      // Sync to the active player card if this user is in the current game
+      for (let i = 0; i < 4; i++) {
+        if (players[i].uid === user.uid) {
+          players[i].photo = result.dataUrl;
+          players[i].zoom = 1.0;
+          players[i].panX = 0;
+          players[i].panY = 0;
+          renderAll();
+          applyPortraitPanFromUrl(i, result.dataUrl);
+          break;
+        }
+      }
       showToast('Photo updated', 'success');
     } catch (err) {
       showToast('Photo upload failed', 'error');
@@ -1203,9 +1247,26 @@ async function renderProfileScreen() {
 function init() {
   console.log("Catan Scoreboard initializing...");
 
-  // Load saved state
+  // Initialize Firebase auth first so the login screen shows even if a later binding fails
+  if (window.firebaseAuth) {
+    initAuth();
+  } else {
+    let attempts = 0;
+    const waitForFirebase = setInterval(() => {
+      attempts++;
+      if (window.firebaseAuth) {
+        clearInterval(waitForFirebase);
+        initAuth();
+      } else if (attempts >= 20) {
+        clearInterval(waitForFirebase);
+        console.warn('Firebase failed to initialize after 10s');
+      }
+    }, 500);
+  }
+
+  // Load saved state (skip if the last game was ended — start fresh)
   const s = loadState();
-  if (s) {
+  if (s && !s.gameEnded) {
     importState(s);
     console.log("State loaded from localStorage");
   }
@@ -1331,9 +1392,9 @@ function init() {
   });
 
   // Game setup modal
-  qs("#setupCancelBtn").addEventListener("click", closeSetupModal);
-  qs("#setupConfirmBtn").addEventListener("click", confirmSetup);
-  qs("#setupModal").addEventListener("click", (e) => {
+  qs("#setupCancelBtn")?.addEventListener("click", closeSetupModal);
+  qs("#setupConfirmBtn")?.addEventListener("click", confirmSetup);
+  qs("#setupModal")?.addEventListener("click", (e) => {
     if (e.target === qs("#setupModal")) closeSetupModal();
   });
 
@@ -1366,13 +1427,6 @@ function init() {
 
   // Player view (non-host)
   qs("#pvLeaveBtn").addEventListener("click", leavePlayerView);
-
-  // Initialize Firebase auth
-  if (window.firebaseAuth) {
-    initAuth();
-  } else {
-    console.warn('Firebase not initialized');
-  }
 
   console.log("Catan Scoreboard initialized successfully!");
 }
