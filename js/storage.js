@@ -105,6 +105,7 @@ function importState(s) {
     for (let i = 0; i < 4; i++) {
       const p = s.players[i] || {};
       players[i].name = typeof p.name === "string" ? p.name : players[i].name;
+      players[i].uid  = p.uid || null;
 
       if (typeof p.colorKey === "string" && COLOR_OPTIONS.some(o => o.key === p.colorKey)) {
         players[i].colorKey = p.colorKey;

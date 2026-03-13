@@ -420,7 +420,14 @@ function closeVictory() {
   saveAll();
   renderAll();
   const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
-  showScreen(user ? 'hostjoin' : 'login');
+  if (user) {
+    showScreen('hostjoin');
+    showHostJoinView('hjChoose');
+    const hostBtn = qs('#hjHostBtn');
+    if (hostBtn) { hostBtn.disabled = false; hostBtn.textContent = '🏠\u00a0 Host a Game'; }
+  } else {
+    showScreen('login');
+  }
 }
 
 // Backup/Export
