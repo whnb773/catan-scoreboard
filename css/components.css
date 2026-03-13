@@ -1390,3 +1390,266 @@ tr:last-child td {
 .user-identity-btn:hover {
   background: rgba(255,255,255,.18);
 }
+
+/* =============================================================
+   PLAYER VIEW (mobile scoreboard for non-host players)
+   ============================================================= */
+
+.pv-screen {
+  min-height: 100dvh;
+  background: var(--bg);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px 12px 32px;
+  box-sizing: border-box;
+}
+
+.pv-card {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Header */
+.pv-header {
+  background: linear-gradient(180deg, var(--wood), var(--wood2));
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 6px 18px var(--shadow);
+  border: 2px solid rgba(255,255,255,.08);
+}
+
+.pv-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pv-title {
+  color: #fff;
+  font-weight: 900;
+  font-size: 18px;
+}
+
+.pv-subtitle {
+  color: rgba(255,255,255,.78);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pv-leave-btn {
+  padding: 7px 14px !important;
+  font-size: 13px !important;
+}
+
+/* Turn indicator */
+.pv-turn-indicator {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px var(--shadow);
+  border: 2px solid rgba(0,0,0,.06);
+}
+
+.pv-my-turn {
+  color: #2a7d0f;
+  font-size: 20px;
+}
+
+.pv-waiting {
+  color: var(--wood2);
+  opacity: .8;
+}
+
+/* Section container */
+.pv-section {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: 0 2px 8px var(--shadow);
+  border: 2px solid rgba(0,0,0,.06);
+}
+
+.pv-section-title {
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  opacity: .5;
+  margin-bottom: 10px;
+}
+
+/* Scoreboard rows */
+.pv-loading {
+  text-align: center;
+  font-size: 13px;
+  opacity: .5;
+  padding: 8px 0;
+}
+
+.pv-score-row {
+  display: grid;
+  grid-template-columns: 14px 1fr 80px 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  transition: background 0.15s;
+}
+
+.pv-score-row:last-child { margin-bottom: 0; }
+
+.pv-score-row--active {
+  background: rgba(0,0,0,.05);
+}
+
+.pv-score-row--me {
+  background: rgba(31,107,214,.07);
+  outline: 1px solid rgba(31,107,214,.2);
+}
+
+.pv-score-row--active.pv-score-row--me {
+  background: rgba(31,107,214,.12);
+}
+
+.pv-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,.15);
+}
+
+.pv-name {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pv-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 900;
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+  margin-left: 3px;
+}
+
+.pv-tag--you {
+  background: rgba(31,107,214,.15);
+  color: #1f6bd6;
+}
+
+.pv-tag--turn {
+  background: rgba(42,125,15,.12);
+  color: #2a7d0f;
+}
+
+.pv-bar-wrap {
+  height: 8px;
+  background: rgba(0,0,0,.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.pv-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--wood), var(--wood2));
+  border-radius: 999px;
+  min-width: 2px;
+  transition: width 0.4s ease;
+}
+
+.pv-vp {
+  font-size: 16px;
+  font-weight: 900;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pv-vp-label {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: .6;
+}
+
+/* Dice section */
+.pv-dice-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.pv-roll-btn {
+  width: 100%;
+  padding: 16px !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.pv-roll-btn:not(:disabled) {
+  animation: pv-pulse 2s infinite;
+}
+
+.pv-roll-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+@keyframes pv-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(183,82,50,.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(183,82,50,.0); }
+}
+
+.pv-last-roll-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.pv-last-roll-label {
+  font-weight: 700;
+  opacity: .6;
+}
+
+.pv-last-roll-value {
+  font-weight: 900;
+  font-size: 16px;
+  color: var(--wood2);
+}
+
+.pv-recent-rolls {
+  font-size: 12px;
+  opacity: .55;
+  font-weight: 600;
+  letter-spacing: .5px;
+  min-height: 16px;
+}
+
+/* Footer */
+.pv-footer {
+  display: flex;
+  gap: 10px;
+}
+
+.pv-action-btn {
+  flex: 1;
+  padding: 12px !important;
+  font-size: 14px !important;
+}

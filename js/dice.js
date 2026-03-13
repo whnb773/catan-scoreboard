@@ -115,6 +115,7 @@ function applyRoll(total, d1 = null, d2 = null) {
   drawCharts();
   saveAll();
   updateUndoUI();
+  if (typeof maybePushLobbySnapshot === 'function') maybePushLobbySnapshot();
 }
 
 // Roll 2d6

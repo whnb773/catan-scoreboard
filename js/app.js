@@ -80,6 +80,7 @@ function attachScoreHandlers() {
 
     updateTotals();
     saveAll();
+    maybePushLobbySnapshot();
   });
 
   document.addEventListener("input", (e) => {
@@ -416,6 +417,15 @@ function resetForNewGame() {
 
 function closeVictory() {
   qs("#victoryOverlay").classList.remove("active");
+
+  // End the active lobby (notifies mobile players game is over)
+  if (_gameActiveLobbyId) {
+    const lobbyIdToEnd = _gameActiveLobbyId;
+    _gameActiveLobbyId = null;
+    endLobby(lobbyIdToEnd).catch(e => console.warn('endLobby on closeVictory:', e));
+    stopGameEventListener();
+  }
+
   resetForNewGame();
   saveAll();
   renderAll();
@@ -543,6 +553,11 @@ let _hjLobbyId  = null;   // active lobby doc ID
 let _hjLobbyUnsub = null; // real-time listener unsubscribe fn
 let _hjIsHost   = false;  // true when this client created the lobby
 
+// Game-active lobby state (survives cleanupLobby; used for snapshot/pendingRoll)
+let _gameActiveLobbyId = null;
+let _pvMyUid = null;        // uid of this player in the player view (guest side)
+let _lastProcessedRollTs = 0; // timestamp of last pendingRoll we processed (host side)
+
 // Show one sub-view within the host/join screen
 function showHostJoinView(view) {
   ['hjChoose', 'hjHosting', 'hjJoining', 'hjWaiting'].forEach(id => {
@@ -557,6 +572,110 @@ function cleanupLobby() {
   if (_hjLobbyUnsub) { _hjLobbyUnsub(); _hjLobbyUnsub = null; }
   _hjLobbyId = null;
   _hjIsHost  = false;
+}
+
+// Build a compact snapshot of current game state for mobile players
+function buildGameSnapshot() {
+  const wp = Number(qs('#winPoints')?.value || 10);
+  return {
+    turnIndex,
+    winPoints: wp,
+    players: players.map((p, i) => ({
+      name: p.name,
+      color: p.color,
+      uid: p.uid || null,
+      score: calcTotal(i)
+    })),
+    lastRoll: rollLog.length ? rollLog[rollLog.length - 1] : null,
+    recentRolls: rollLog.slice(-8).reverse().map(r => r.total),
+    updatedAt: Date.now()
+  };
+}
+
+// Push a snapshot if there's an active game lobby (called after dice rolls and score changes)
+function maybePushLobbySnapshot() {
+  if (!_gameActiveLobbyId || typeof pushGameSnapshot !== 'function') return;
+  pushGameSnapshot(_gameActiveLobbyId, buildGameSnapshot()).catch(() => {});
+}
+
+// Render the mobile player view with the latest game snapshot
+function renderPlayerView(snapshot) {
+  if (!snapshot) return;
+  const myUid = _pvMyUid;
+  const { turnIndex: ti, players: pls, lastRoll, recentRolls = [], winPoints = 10 } = snapshot;
+
+  const isMyTurn = pls[ti]?.uid === myUid;
+
+  // Turn indicator
+  const turnEl = qs('#pvTurnIndicator');
+  if (turnEl) {
+    if (isMyTurn) {
+      turnEl.innerHTML = '<span class="pv-my-turn">🎲 Your turn!</span>';
+    } else {
+      turnEl.innerHTML = `<span class="pv-waiting">⏳ ${escapeHTML(pls[ti]?.name || 'Someone')}'s turn…</span>`;
+    }
+  }
+
+  // Roll button
+  const rollBtn = qs('#pvRollBtn');
+  if (rollBtn) {
+    rollBtn.disabled = !isMyTurn;
+    rollBtn.classList.toggle('pv-roll-active', isMyTurn);
+  }
+
+  // Scoreboard
+  const board = qs('#pvScoreboard');
+  if (board) {
+    board.innerHTML = pls.map((p, i) => {
+      const isCurrentTurn = i === ti;
+      const isMe = p.uid === myUid;
+      const pct = Math.min(100, winPoints > 0 ? Math.round((p.score / winPoints) * 100) : 0);
+      return `
+        <div class="pv-score-row${isCurrentTurn ? ' pv-score-row--active' : ''}${isMe ? ' pv-score-row--me' : ''}">
+          <div class="pv-swatch" style="background:${escapeAttr(p.color)}"></div>
+          <div class="pv-name">${escapeHTML(p.name)}${isMe ? ' <span class="pv-tag pv-tag--you">You</span>' : ''}${isCurrentTurn ? ' <span class="pv-tag pv-tag--turn">▶</span>' : ''}</div>
+          <div class="pv-bar-wrap"><div class="pv-bar" style="width:${pct}%"></div></div>
+          <div class="pv-vp">${p.score}<span class="pv-vp-label"> VP</span></div>
+        </div>`;
+    }).join('');
+  }
+
+  // Last roll
+  const lastRollEl = qs('#pvLastRoll');
+  if (lastRollEl) {
+    if (lastRoll) {
+      lastRollEl.textContent = lastRoll.d1 != null
+        ? `${lastRoll.d1} + ${lastRoll.d2} = ${lastRoll.total}`
+        : String(lastRoll.total);
+    } else {
+      lastRollEl.textContent = '—';
+    }
+  }
+
+  // Recent rolls
+  const recentEl = qs('#pvRecentRolls');
+  if (recentEl) {
+    recentEl.textContent = recentRolls.length ? recentRolls.join('  ') : '';
+  }
+}
+
+// Player rolls dice from their phone
+async function pvRollDice() {
+  if (!_gameActiveLobbyId || !_pvMyUid) return;
+  const btn = qs('#pvRollBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Rolling…'; }
+
+  const d1 = rollDie();
+  const d2 = rollDie();
+
+  try {
+    await submitPendingRoll(_gameActiveLobbyId, { uid: _pvMyUid, die1: d1, die2: d2, ts: Date.now() });
+    showToast(`You rolled ${d1} + ${d2} = ${d1 + d2}!`, 'success');
+  } catch (err) {
+    console.error('pvRollDice error:', err);
+    showToast('Roll failed: ' + err.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '🎲 Roll Dice'; }
+  }
 }
 
 // ─── HOST ─────────────────────────────────────────────────────
@@ -673,6 +792,10 @@ async function hostStartGame() {
       }
     }
 
+    // Save lobby ID for game snapshot before cleanupLobby() clears it
+    _gameActiveLobbyId = _hjLobbyId;
+    _lastProcessedRollTs = 0;
+
     // Mark lobby active → triggers joined players' listeners
     await startLobbyGame(_hjLobbyId);
 
@@ -681,12 +804,33 @@ async function hostStartGame() {
     startTimer();
     renderAll();
     saveAll();
+    maybePushLobbySnapshot();
     showToast('Game started!', 'success');
 
     // Apply portrait pan after DOM is ready
     for (let i = 0; i < Math.min(lobbyPlayers.length, 4); i++) {
       if (lobbyPlayers[i].avatarUrl) applyPortraitPanFromUrl(i, lobbyPlayers[i].avatarUrl);
     }
+
+    // Listen for pending rolls from mobile players
+    listenToGameEvents(_gameActiveLobbyId, async (lobby) => {
+      const pr = lobby.pendingRoll;
+      if (pr && pr.uid && pr.ts && pr.ts > _lastProcessedRollTs) {
+        // Only process if it's this player's turn
+        if (players[turnIndex] && players[turnIndex].uid === pr.uid) {
+          _lastProcessedRollTs = pr.ts;
+          snapshot('Remote roll');
+          showDiceOverlay(pr.die1, pr.die2, pr.die1 + pr.die2);
+          // Clear pendingRoll immediately to prevent double-processing
+          const { doc, setDoc } = window.firestoreMethods;
+          setDoc(doc(window.firebaseDb, 'lobbies', _gameActiveLobbyId),
+            { pendingRoll: null }, { merge: true }).catch(() => {});
+          setTimeout(() => {
+            applyRoll(pr.die1 + pr.die2, pr.die1, pr.die2);
+          }, 600);
+        }
+      }
+    });
 
   } catch (err) {
     console.error('hostStartGame error:', err);
@@ -740,10 +884,35 @@ async function submitPin() {
     _hjLobbyUnsub = listenToLobby(lobby.id, updatedLobby => {
       if (updatedLobby.status === 'active') {
         const myData = updatedLobby.players.find(p => p.uid === user.uid);
+
+        // Set up guest game state
+        _pvMyUid = user.uid;
+        _gameActiveLobbyId = lobby.id;
+
+        // Stop waiting listener; game listener replaces it
+        cleanupLobby();
+
+        // Show player view with player name in header
         const pvName = qs('#pvPlayerName');
         if (pvName) pvName.textContent = myData?.displayName || user.displayName || user.email;
-        cleanupLobby();
         showScreen('playerView');
+
+        // Render immediately if snapshot already present
+        if (updatedLobby.gameSnapshot) renderPlayerView(updatedLobby.gameSnapshot);
+
+        // Keep listening for snapshot + game end
+        listenToLobby(_gameActiveLobbyId, latestLobby => {
+          if (latestLobby.gameSnapshot) renderPlayerView(latestLobby.gameSnapshot);
+          if (latestLobby.status === 'ended') {
+            stopLobbyListener();
+            _gameActiveLobbyId = null;
+            _pvMyUid = null;
+            showToast('The game has ended', 'info');
+            showScreen('hostjoin');
+            showHostJoinView('hjChoose');
+          }
+        });
+
       } else if (updatedLobby.status === 'ended') {
         showToast('Lobby was closed by the host', 'error');
         cleanupLobby();
@@ -771,6 +940,10 @@ async function leaveWaitingLobby() {
 // ─── PLAYER VIEW ──────────────────────────────────────────────
 
 function leavePlayerView() {
+  stopLobbyListener();
+  stopGameEventListener();
+  _gameActiveLobbyId = null;
+  _pvMyUid = null;
   showScreen('hostjoin');
   showHostJoinView('hjChoose');
 }
@@ -1448,6 +1621,10 @@ function init() {
 
   // Player view (non-host)
   qs("#pvLeaveBtn").addEventListener("click", leavePlayerView);
+  qs("#pvRollBtn")?.addEventListener("click", pvRollDice);
+  qs("#pvProfileBtn")?.addEventListener("click", () => {
+    if (typeof showProfileScreen === 'function') showProfileScreen('playerView');
+  });
 
   console.log("Catan Scoreboard initialized successfully!");
 }

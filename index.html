@@ -140,19 +140,47 @@
     </div>
   </div>
 
-  <!-- Player View (placeholder for non-host players once game starts) -->
-  <div id="playerView" class="hj-screen" style="display:none">
-    <div class="login-card" style="text-align:center">
-      <div class="login-logo" style="font-size:48px; margin-bottom:10px;">🎲</div>
-      <h2 style="color:var(--wood2); margin:0 0 6px; font-size:22px;">Game in Progress</h2>
-      <p class="hj-subtitle">
-        You are playing as <strong id="pvPlayerName"></strong>
-      </p>
-      <div class="login-divider"></div>
-      <p style="font-size:12px; opacity:.5; font-weight:700; margin:0 0 20px;">
-        Full mobile view coming in a future update.
-      </p>
-      <button class="btn secondary" id="pvLeaveBtn">Leave game</button>
+  <!-- Player View (mobile scoreboard for non-host players) -->
+  <div id="playerView" class="pv-screen" style="display:none">
+    <div class="pv-card">
+
+      <!-- Header -->
+      <div class="pv-header">
+        <div class="pv-header-left">
+          <span class="pv-title">🎮 Catan</span>
+          <span class="pv-subtitle">Playing as <strong id="pvPlayerName"></strong></span>
+        </div>
+        <button class="btn secondary pv-leave-btn" id="pvLeaveBtn">Leave</button>
+      </div>
+
+      <!-- Turn indicator -->
+      <div id="pvTurnIndicator" class="pv-turn-indicator">
+        <span class="pv-waiting">⏳ Waiting for game to start…</span>
+      </div>
+
+      <!-- Scoreboard -->
+      <div class="pv-section">
+        <div class="pv-section-title">Scoreboard</div>
+        <div id="pvScoreboard" class="pv-scoreboard">
+          <div class="pv-loading">Waiting for first update…</div>
+        </div>
+      </div>
+
+      <!-- Roll dice -->
+      <div class="pv-section pv-dice-section">
+        <button class="btn pv-roll-btn" id="pvRollBtn" disabled>🎲 Roll Dice</button>
+        <div class="pv-last-roll-wrap">
+          <span class="pv-last-roll-label">Last roll:</span>
+          <span id="pvLastRoll" class="pv-last-roll-value">—</span>
+        </div>
+        <div id="pvRecentRolls" class="pv-recent-rolls"></div>
+      </div>
+
+      <!-- Footer actions -->
+      <div class="pv-footer">
+        <button class="btn secondary pv-action-btn" id="pvProfileBtn">👤 My Profile</button>
+      </div>
+
     </div>
   </div>
 

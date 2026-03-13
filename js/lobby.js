@@ -13,6 +13,7 @@
 // Module-level state
 let activeLobbyId = null;
 let lobbyUnsubscribe = null;
+let gameEventUnsubscribe = null;
 
 // ─── PIN ──────────────────────────────────────────────────────
 
@@ -145,6 +146,54 @@ async function endLobby(lobbyId) {
     { status: 'ended' },
     { merge: true }
   );
+}
+
+// ─── LEAVE (non-host player) ──────────────────────────────────
+
+// ─── GAME SNAPSHOT (host → non-host players) ──────────────────
+
+// Push a compact game state snapshot to the lobby doc so mobile players can read it
+async function pushGameSnapshot(lobbyId, snapshot) {
+  const { doc, setDoc } = window.firestoreMethods;
+  try {
+    await setDoc(
+      doc(window.firebaseDb, 'lobbies', lobbyId),
+      { gameSnapshot: snapshot },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('pushGameSnapshot error:', err);
+  }
+}
+
+// Write a pending roll from a non-host player
+async function submitPendingRoll(lobbyId, rollData) {
+  const { doc, setDoc } = window.firestoreMethods;
+  await setDoc(
+    doc(window.firebaseDb, 'lobbies', lobbyId),
+    { pendingRoll: rollData },
+    { merge: true }
+  );
+}
+
+// ─── GAME EVENT LISTENER (separate from lobby waiting listener) ─
+
+function listenToGameEvents(lobbyId, callback) {
+  const { doc, onSnapshot } = window.firestoreMethods;
+  stopGameEventListener();
+  const ref = doc(window.firebaseDb, 'lobbies', lobbyId);
+  gameEventUnsubscribe = onSnapshot(ref,
+    snap => { if (snap.exists()) callback({ id: snap.id, ...snap.data() }); },
+    err  => { console.error('Game event listener error:', err); }
+  );
+  return gameEventUnsubscribe;
+}
+
+function stopGameEventListener() {
+  if (gameEventUnsubscribe) {
+    gameEventUnsubscribe();
+    gameEventUnsubscribe = null;
+  }
 }
 
 // ─── LEAVE (non-host player) ──────────────────────────────────
