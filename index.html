@@ -14,13 +14,14 @@
   <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
 
   <!-- Reset screen states immediately (guards against bfcache restoring stale DOM) -->
   <script>
     (function(){
-      var ids = ['hostJoinScreen','mainApp','playerView','profileScreen','leaderboardScreen'];
+      var ids = ['hostJoinScreen','mainApp','playerView','profileScreen','leaderboardScreen','adminScreen'];
       for (var i=0; i<ids.length; i++) {
         var el = document.getElementById(ids[i]);
         if (el) el.style.display = 'none';
@@ -82,6 +83,9 @@
           <button class="btn secondary hj-nav-btn" id="hjProfileBtn">👤 My Profile</button>
           <button class="btn secondary hj-nav-btn" id="hjLeaderboardBtn">🏆 Leaderboard</button>
         </div>
+        <div class="hj-nav-row" id="hjAdminRow" style="display:none">
+          <button class="btn secondary hj-nav-btn" id="hjAdminBtn" style="background:rgba(183,58,42,.1);border:1.5px solid rgba(183,58,42,.25);color:var(--accent);">🛠️ Admin Panel</button>
+        </div>
       </div>
 
       <!-- Sub-view: hosting — PIN + QR + player list -->
@@ -141,6 +145,100 @@
       </div>
       <div id="profileScreenContent">
         <div class="small" style="opacity:.6;padding:20px 0;">Loading&hellip;</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Screen -->
+  <div id="adminScreen" class="admin-screen" style="display:none">
+    <div class="admin-card">
+
+      <!-- Top bar -->
+      <div class="admin-topbar">
+        <button class="btn secondary" id="adminBackBtn" style="padding:6px 14px;font-size:13px;">&#8592; Back</button>
+        <h2 class="admin-title">🛠️ Admin Panel</h2>
+      </div>
+
+      <!-- Tabs -->
+      <div class="admin-tabs">
+        <button class="admin-tab active" data-tab="dashboard">Dashboard</button>
+        <button class="admin-tab"        data-tab="users">Users</button>
+        <button class="admin-tab"        data-tab="errors">Errors</button>
+      </div>
+
+      <!-- Dashboard Panel -->
+      <div id="adminPanel-dashboard" class="admin-panel">
+        <div class="admin-stat-row">
+          <div class="admin-stat-card">
+            <span class="kicker">Registered Users</span>
+            <strong id="adminStatUsers" class="admin-stat-val">…</strong>
+          </div>
+          <div class="admin-stat-card">
+            <span class="kicker">Games Played</span>
+            <strong id="adminStatGames" class="admin-stat-val">…</strong>
+          </div>
+          <div class="admin-stat-card">
+            <span class="kicker">Active Lobbies</span>
+            <strong id="adminStatLobbies" class="admin-stat-val">…</strong>
+          </div>
+          <div class="admin-stat-card">
+            <span class="kicker">Est. Total Docs</span>
+            <strong id="adminStatDocs" class="admin-stat-val">…</strong>
+            <span class="admin-stat-note">Free tier: 50k reads/day · 20k writes/day · 1 GB</span>
+          </div>
+        </div>
+
+        <div class="admin-section">
+          <div class="section-title">Games per Week — Last 12 Weeks</div>
+          <canvas id="adminActivityChart" class="admin-chart"></canvas>
+        </div>
+
+        <div class="admin-section">
+          <div class="section-title">Recent Errors</div>
+          <div id="adminRecentErrors" class="admin-error-list">
+            <div class="admin-loading">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Users Panel -->
+      <div id="adminPanel-users" class="admin-panel" style="display:none">
+        <div class="admin-search-row">
+          <input type="text" id="adminUserSearch" class="admin-search" placeholder="Search by name or email…" />
+        </div>
+        <div id="adminUsersContent" class="admin-user-list">
+          <div class="admin-loading">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Errors Panel -->
+      <div id="adminPanel-errors" class="admin-panel" style="display:none">
+        <div id="adminErrorsContent" class="admin-error-list">
+          <div class="admin-loading">Loading…</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- User detail overlay -->
+    <div id="adminUserDetail" class="admin-overlay" style="display:none">
+      <div class="admin-overlay-card">
+        <div class="admin-overlay-topbar">
+          <button class="btn secondary" id="adminUserDetailClose" style="padding:6px 14px;font-size:13px;">&#8592; Back</button>
+          <h3 class="admin-overlay-title">User Detail</h3>
+        </div>
+        <div id="adminUserDetailContent"></div>
+      </div>
+    </div>
+
+    <!-- Error detail overlay -->
+    <div id="adminErrorDetail" class="admin-overlay" style="display:none">
+      <div class="admin-overlay-card">
+        <div class="admin-overlay-topbar">
+          <button class="btn secondary" id="adminErrorDetailClose" style="padding:6px 14px;font-size:13px;">&#8592; Back</button>
+          <h3 class="admin-overlay-title">Error Detail</h3>
+        </div>
+        <div id="adminErrorDetailContent"></div>
       </div>
     </div>
   </div>
@@ -519,7 +617,7 @@
     // Import Firebase modules
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
     import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-    import { getFirestore, doc, setDoc, getDoc, addDoc, collection, query, where, getDocs, orderBy, limit, runTransaction, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+    import { getFirestore, doc, setDoc, getDoc, addDoc, collection, query, where, getDocs, orderBy, limit, runTransaction, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
     // Import our config
     import { firebaseConfig } from './js/firebase-config.js';
@@ -530,7 +628,7 @@
     window.firebaseAuth = getAuth(app);
     window.firebaseDb = getFirestore(app);
     window.firebaseAuthMethods = { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut };
-    window.firestoreMethods = { doc, setDoc, getDoc, addDoc, collection, query, where, getDocs, orderBy, limit, runTransaction, onSnapshot };
+    window.firestoreMethods = { doc, setDoc, getDoc, addDoc, collection, query, where, getDocs, orderBy, limit, runTransaction, onSnapshot, deleteDoc };
     
     console.log('Firebase initialized!');
   </script>
@@ -549,5 +647,7 @@
   <script src="js/firebase-auth.js"></script>
   <script src="js/firebase-firestore.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/error-logger.js"></script>
+  <script src="js/admin.js"></script>
 </body>
 </html>

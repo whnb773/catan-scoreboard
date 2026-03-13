@@ -1656,6 +1656,13 @@ function init() {
   qs("#hjProfileBtn")?.addEventListener("click", () => showProfileScreen('hostjoin'));
   qs("#userIdentity").addEventListener("click", () => showProfileScreen('game'));
 
+  // Admin screen
+  qs("#hjAdminBtn")?.addEventListener("click", () => showAdminScreen('hostjoin'));
+  qs("#adminBackBtn")?.addEventListener("click", () => showScreen(typeof _adminReturnScreen !== 'undefined' ? _adminReturnScreen : 'hostjoin'));
+  qs("#adminUserDetailClose")?.addEventListener("click", closeAdminUserDetail);
+  qs("#adminErrorDetailClose")?.addEventListener("click", closeAdminErrorDetail);
+  if (typeof initAdminListeners === 'function') initAdminListeners();
+
   // Host/join screen buttons
   qs("#hjHostBtn").addEventListener("click", startHosting);
   qs("#hjJoinBtn").addEventListener("click", showJoinView);

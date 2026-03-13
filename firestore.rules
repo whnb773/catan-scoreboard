@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper: is the requesting user an admin? ─────────────────────────
+    // Reads the admin email list from config/admins (managed manually
+    // in the Firebase console — not writable by clients).
+    function isAdmin() {
+      return request.auth != null
+          && request.auth.token.email in
+             get(/databases/$(database)/documents/config/admins).data.emails;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // ── config/admins ─────────────────────────────────────────────────────
+    // Any signed-in user may read (needed so error-logger doesn't fail),
+    // but no client may write — edit this doc manually in the console.
+    match /config/{doc} {
+      allow read:  if isSignedIn();
+      allow write: if false;
+    }
+
+    // ── users/{uid} ───────────────────────────────────────────────────────
+    // A user can read/write their own doc.
+    // Admins can read any user doc (for the user browser).
+    match /users/{uid} {
+      allow read:  if request.auth.uid == uid || isAdmin();
+      allow write: if request.auth.uid == uid;
+
+      // Subcollections (meta/gameRefs, games/current, history/*)
+      match /{sub}/{docId} {
+        allow read:  if request.auth.uid == uid || isAdmin();
+        allow write: if request.auth.uid == uid;
+      }
+    }
+
+    // ── games/{gameId} ────────────────────────────────────────────────────
+    // Any signed-in user may write (hosts record game results).
+    // Only admins may read (prevents leaking other players' game data).
+    match /games/{gameId} {
+      allow read:  if isAdmin();
+      allow write: if isSignedIn();
+    }
+
+    // ── lobbies/{lobbyId} ─────────────────────────────────────────────────
+    // Any signed-in user may read/write (live lobby sync).
+    match /lobbies/{lobbyId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // ── client_errors/{errorId} ───────────────────────────────────────────
+    // Any signed-in user may create error docs (error logger).
+    // Only admins may read or delete.
+    match /client_errors/{errorId} {
+      allow create: if isSignedIn();
+      allow read:   if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}

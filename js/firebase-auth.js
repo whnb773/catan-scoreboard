@@ -17,7 +17,8 @@ function showScreen(name) {
     game:        qs('#mainApp'),
     playerView:  qs('#playerView'),
     profile:     qs('#profileScreen'),
-    leaderboard: qs('#leaderboardScreen')
+    leaderboard: qs('#leaderboardScreen'),
+    admin:       qs('#adminScreen')
   };
   Object.keys(map).forEach(key => {
     const el = map[key];
@@ -28,6 +29,13 @@ function showScreen(name) {
   // Redraw canvas charts once the game panel is actually visible
   if (name === 'game' && typeof drawCharts === 'function') {
     requestAnimationFrame(() => drawCharts());
+  }
+  // Redraw admin activity chart when admin panel becomes visible
+  if (name === 'admin' && typeof renderActivityChart === 'function') {
+    requestAnimationFrame(() => {
+      const canvas = qs('#adminActivityChart');
+      if (canvas && canvas._weekData) renderActivityChart(canvas._weekData);
+    });
   }
 }
 
@@ -89,7 +97,9 @@ function updateAuthUI(user) {
     if (hjName)  hjName.textContent = user.displayName || user.email;
     if (hjBadge) hjBadge.style.display = (ADMIN_EMAILS || []).includes(user.email) ? 'inline' : 'none';
 
-
+    // Show admin button row for admin users only
+    const adminRow = qs('#hjAdminRow');
+    if (adminRow) adminRow.style.display = (ADMIN_EMAILS || []).includes(user.email) ? '' : 'none';
 
   } else {
     showScreen('login');
