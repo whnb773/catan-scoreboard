@@ -35,7 +35,7 @@ async function createLobby(user) {
     players: [{
       uid: user.uid,
       displayName: user.displayName || user.email,
-      avatarUrl: user.photoURL || '',
+      avatarUrl: (typeof getCurrentUserProfile === 'function' && getCurrentUserProfile()?.avatarUrl) || user.photoURL || '',
       isHost: true
     }]
   });
@@ -92,7 +92,7 @@ async function joinLobby(lobbyId, user) {
   const updated = [...data.players, {
     uid: user.uid,
     displayName: user.displayName || user.email,
-    avatarUrl: user.photoURL || '',
+    avatarUrl: (typeof getCurrentUserProfile === 'function' && getCurrentUserProfile()?.avatarUrl) || user.photoURL || '',
     isHost: false
   }];
 

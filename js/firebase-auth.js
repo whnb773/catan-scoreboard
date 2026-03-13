@@ -88,8 +88,7 @@ function updateAuthUI(user) {
     if (hjName)  hjName.textContent = user.displayName || user.email;
     if (hjBadge) hjBadge.style.display = (ADMIN_EMAILS || []).includes(user.email) ? 'inline' : 'none';
 
-    // Show "continue saved game" link if there's local state
-    if (typeof checkForSavedGame === 'function') checkForSavedGame();
+
 
   } else {
     showScreen('login');

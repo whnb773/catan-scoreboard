@@ -551,12 +551,6 @@ function showHostJoinView(view) {
   });
 }
 
-// Show the "continue saved game" link if local state exists
-function checkForSavedGame() {
-  const saved = loadState();
-  const wrap = qs('#hjContinueWrap');
-  if (wrap) wrap.style.display = saved ? 'block' : 'none';
-}
 
 // Clean up listener and lobby tracking state
 function cleanupLobby() {
@@ -653,17 +647,28 @@ async function hostStartGame() {
     let lobbyPlayers = [];
     if (snap.exists()) {
       lobbyPlayers = snap.data().players;
-      for (let i = 0; i < Math.min(lobbyPlayers.length, 4); i++) {
-        const p = lobbyPlayers[i];
-        players[i].name = p.displayName;
-        players[i].uid  = p.uid;
-        if (p.avatarUrl) {
-          players[i].photo = p.avatarUrl;
+      const defaultNames = ["Player 1", "Player 2", "Player 3", "Player 4"];
+      const defaultColorKeys = ["red", "blue", "orange", "white"];
+      for (let i = 0; i < 4; i++) {
+        if (i < lobbyPlayers.length) {
+          const p = lobbyPlayers[i];
+          players[i].name = p.displayName;
+          players[i].uid  = p.uid;
+          players[i].photo = p.avatarUrl || '';
           players[i].zoom  = 1.0;
           players[i].panX  = 0;
           players[i].panY  = 0;
           players[i].natW  = 0;
           players[i].natH  = 0;
+        } else {
+          players[i].name = defaultNames[i];
+          players[i].uid  = null;
+          players[i].photo = '';
+          players[i].zoom  = 1.25;
+          players[i].panX  = 0;
+          players[i].panY  = 0;
+          players[i].colorKey = defaultColorKeys[i];
+          players[i].color = colorFromKey(defaultColorKeys[i]);
         }
       }
     }
@@ -911,21 +916,30 @@ function buildSetupSlot(i) {
 function confirmSetup() {
   snapshot("Game setup");
 
-  // Apply slot data to players array
+  // Apply slot data to players array; reset unused slots to clean defaults
+  const defaultNames = ["Player 1", "Player 2", "Player 3", "Player 4"];
+  const defaultColorKeys = ["red", "blue", "orange", "white"];
   for (let i = 0; i < 4; i++) {
     const d = setupSlotData[i];
     if (d) {
       players[i].name  = d.displayName;
       players[i].color = d.colourPref;
       players[i].uid   = d.uid || null;
-      if (d.avatarUrl) {
-        players[i].photo = d.avatarUrl;
-        players[i].zoom  = 1.0;
-        players[i].panX  = 0;
-        players[i].panY  = 0;
-        players[i].natW  = 0;
-        players[i].natH  = 0;
-      }
+      players[i].photo = d.avatarUrl || '';
+      players[i].zoom  = d.avatarUrl ? 1.0 : 1.25;
+      players[i].panX  = 0;
+      players[i].panY  = 0;
+      players[i].natW  = 0;
+      players[i].natH  = 0;
+    } else {
+      players[i].name     = defaultNames[i];
+      players[i].uid      = null;
+      players[i].photo    = '';
+      players[i].zoom     = 1.25;
+      players[i].panX     = 0;
+      players[i].panY     = 0;
+      players[i].colorKey = defaultColorKeys[i];
+      players[i].color    = colorFromKey(defaultColorKeys[i]);
     }
   }
 
@@ -1417,7 +1431,7 @@ function init() {
   // Host/join screen buttons
   qs("#hjHostBtn").addEventListener("click", startHosting);
   qs("#hjJoinBtn").addEventListener("click", showJoinView);
-  qs("#hjContinueBtn").addEventListener("click", () => showScreen('game'));
+
   qs("#hjSignOutBtn").addEventListener("click", signOutUser);
 
   // Hosting sub-view
