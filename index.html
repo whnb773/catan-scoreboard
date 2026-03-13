@@ -115,6 +115,19 @@
     </div>
   </div>
 
+  <!-- Profile Screen -->
+  <div id="profileScreen" class="profile-screen" style="display:none">
+    <div class="profile-card">
+      <div class="profile-topbar">
+        <button class="btn secondary" id="profileBackBtn" style="padding:6px 14px;font-size:13px;">&#8592; Back</button>
+        <h2 class="profile-title">My Profile</h2>
+      </div>
+      <div id="profileScreenContent">
+        <div class="small" style="opacity:.6;padding:20px 0;">Loading&hellip;</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Player View (placeholder for non-host players once game starts) -->
   <div id="playerView" class="hj-screen" style="display:none">
     <div class="login-card" style="text-align:center">
@@ -168,9 +181,11 @@
 
           <!-- Logged in -->
           <div id="loggedIn" style="display:none; align-items:center; gap:8px;">
-            <img id="userPhoto" src="" alt="User" style="width:32px; height:32px; border-radius:50%; border:2px solid rgba(255,255,255,.3);" />
-            <span id="userName" style="font-size:13px; font-weight:900;"></span>
-            <span id="adminBadge" class="admin-badge" style="display:none;">Admin</span>
+            <div id="userIdentity" class="user-identity-btn" title="View profile">
+              <img id="userPhoto" src="" alt="User" style="width:32px; height:32px; border-radius:50%; border:2px solid rgba(255,255,255,.3);" />
+              <span id="userName" style="font-size:13px; font-weight:900;"></span>
+              <span id="adminBadge" class="admin-badge" style="display:none;">Admin</span>
+            </div>
             <button class="btn secondary" id="logoutBtn" style="padding:6px 12px; font-size:12px;">
               Sign out
             </button>

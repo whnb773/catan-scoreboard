@@ -296,15 +296,27 @@ function renderPlayers() {
       const result = await resizeAndCompressImage(file, MAX_PHOTO_SIZE, PHOTO_QUALITY);
 
       players[i].photo = result.dataUrl;
-      players[i].natW = result.w;
-      players[i].natH = result.h;
-      players[i].panX = 0;
-      players[i].panY = 0;
-      players[i].zoom = 1.35;
+      players[i].natW  = result.w;
+      players[i].natH  = result.h;
+      players[i].panX  = 0;
+      players[i].panY  = 0;
+      players[i].zoom  = 1.0;
 
       fileInput.value = "";
 
       renderAll();
+
+      // Portrait auto-pan: favour the top third where faces tend to appear
+      if (result.h > result.w) {
+        const box = qs(`[data-photo-box="${i}"]`);
+        if (box) {
+          const { baseH } = getCoverBaseSize(i, box.clientWidth, box.clientHeight);
+          const maxY = Math.max(0, (baseH - box.clientHeight) / 2);
+          players[i].panY = -maxY * 0.4;
+          applyPhotoStyles(i);
+        }
+      }
+
       saveAll();
     });
 

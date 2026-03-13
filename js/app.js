@@ -471,6 +471,32 @@ function clearHistory() {
 }
 
 // =============================================================
+// AVATAR HELPERS (zoom defaults + portrait auto-pan)
+// =============================================================
+
+// After renderAll() places an avatar image in slot i, load its dimensions
+// async and nudge panY upward if portrait so the face sits in the top third.
+function applyPortraitPanFromUrl(i, url) {
+  if (!url || !players[i].photo) return;
+  loadImage(url).then(img => {
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    players[i].natW = w;
+    players[i].natH = h;
+    if (h > w) {
+      const box = qs(`[data-photo-box="${i}"]`);
+      if (box) {
+        const { baseH } = getCoverBaseSize(i, box.clientWidth, box.clientHeight);
+        const maxY = Math.max(0, (baseH - box.clientHeight) / 2);
+        players[i].panY = -maxY * 0.4;
+      }
+    }
+    applyPhotoStyles(i);
+    saveAll();
+  }).catch(() => {});
+}
+
+// =============================================================
 // HOST / JOIN SCREEN
 // =============================================================
 
@@ -585,13 +611,21 @@ async function hostStartGame() {
     // Fetch current lobby players and apply to game state
     const { doc, getDoc } = window.firestoreMethods;
     const snap = await getDoc(doc(window.firebaseDb, 'lobbies', _hjLobbyId));
+    let lobbyPlayers = [];
     if (snap.exists()) {
-      const lobbyPlayers = snap.data().players;
+      lobbyPlayers = snap.data().players;
       for (let i = 0; i < Math.min(lobbyPlayers.length, 4); i++) {
         const p = lobbyPlayers[i];
         players[i].name = p.displayName;
         players[i].uid  = p.uid;
-        if (!players[i].photo && p.avatarUrl) players[i].photo = p.avatarUrl;
+        if (p.avatarUrl) {
+          players[i].photo = p.avatarUrl;
+          players[i].zoom  = 1.0;
+          players[i].panX  = 0;
+          players[i].panY  = 0;
+          players[i].natW  = 0;
+          players[i].natH  = 0;
+        }
       }
     }
 
@@ -604,6 +638,11 @@ async function hostStartGame() {
     renderAll();
     saveAll();
     showToast('Game started!', 'success');
+
+    // Apply portrait pan after DOM is ready
+    for (let i = 0; i < Math.min(lobbyPlayers.length, 4); i++) {
+      if (lobbyPlayers[i].avatarUrl) applyPortraitPanFromUrl(i, lobbyPlayers[i].avatarUrl);
+    }
 
   } catch (err) {
     console.error('hostStartGame error:', err);
@@ -837,12 +876,16 @@ function confirmSetup() {
   for (let i = 0; i < 4; i++) {
     const d = setupSlotData[i];
     if (d) {
-      players[i].name = d.displayName;
+      players[i].name  = d.displayName;
       players[i].color = d.colourPref;
-      players[i].uid = d.uid || null;
-      // Only set avatar as photo if no existing player photo
-      if (!players[i].photo && d.avatarUrl) {
+      players[i].uid   = d.uid || null;
+      if (d.avatarUrl) {
         players[i].photo = d.avatarUrl;
+        players[i].zoom  = 1.0;
+        players[i].panX  = 0;
+        players[i].panY  = 0;
+        players[i].natW  = 0;
+        players[i].natH  = 0;
       }
     }
   }
@@ -852,6 +895,11 @@ function confirmSetup() {
   closeSetupModal();
   startTimer();
   showToast("Game started!", "success");
+
+  // Apply portrait pan after DOM is ready
+  for (let i = 0; i < 4; i++) {
+    if (setupSlotData[i]?.avatarUrl) applyPortraitPanFromUrl(i, setupSlotData[i].avatarUrl);
+  }
 }
 
 // =============================================================
@@ -991,6 +1039,164 @@ async function renderLeaderboard() {
       <tbody>${rows}</tbody>
     </table>
   `;
+}
+
+// =============================================================
+// PROFILE SCREEN
+// =============================================================
+
+let _profileReturnScreen = 'hostjoin';
+
+function showProfileScreen(returnScreen) {
+  _profileReturnScreen = returnScreen || 'hostjoin';
+  showScreen('profile');
+  renderProfileScreen();
+}
+
+async function renderProfileScreen() {
+  const el = qs('#profileScreenContent');
+  if (!el) return;
+  const user = getCurrentUser();
+  if (!user) { showScreen('hostjoin'); return; }
+
+  el.innerHTML = '<div class="small" style="opacity:.6;padding:20px 0;">Loading&hellip;</div>';
+
+  const [profile, games] = await Promise.all([
+    getUserProfile(user.uid),
+    getUserGames(user.uid)
+  ]);
+
+  if (!profile) {
+    el.innerHTML = '<div class="small" style="padding:20px 0;">Profile not found.</div>';
+    return;
+  }
+
+  const winRate = profile.totalGames > 0
+    ? Math.round((profile.totalWins / profile.totalGames) * 100) : 0;
+  const avgVP = profile.totalGames > 0
+    ? Math.round((profile.totalVP || 0) / profile.totalGames) : 0;
+
+  const initials = (profile.displayName || '?').slice(0, 2).toUpperCase();
+  const avatarHtml = profile.avatarUrl
+    ? `<img src="${escapeAttr(profile.avatarUrl)}" alt="" onerror="this.style.display='none'" />`
+    : initials;
+
+  const gamesHtml = games.length === 0
+    ? '<tr><td colspan="4" style="text-align:center;padding:14px;opacity:.6;font-size:12px;font-weight:700;">No games yet.</td></tr>'
+    : games.slice(0, 5).map(g => {
+        const mySlot = g.players?.find(p => p.uid === user.uid);
+        const date = new Date(g.endedAt || g.startedAt || 0).toLocaleDateString();
+        const isWin = !!mySlot?.isWinner;
+        return `<tr>
+          <td>${date}</td>
+          <td style="font-weight:900;color:${isWin ? 'var(--good)' : 'var(--accent)'};">${isWin ? 'Win' : 'Loss'}</td>
+          <td class="mono">${mySlot?.finalScore ?? '-'}</td>
+          <td class="mono">${formatTime(g.durationMs || 0)}</td>
+        </tr>`;
+      }).join('');
+
+  el.innerHTML = `
+    <div class="profile-avatar-area">
+      <div class="profile-avatar-circle" id="profileAvatarCircle">${avatarHtml}</div>
+      <button class="btn secondary" id="profilePhotoBtn" style="padding:6px 14px;font-size:12px;">Change photo</button>
+      <input type="file" accept="image/*" id="profilePhotoInput" style="display:none" />
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="profile-fields">
+      <div>
+        <div class="profile-field-label">Display Name</div>
+        <input type="text" id="profileDisplayNameInput" class="profile-field-input"
+          value="${escapeAttr(profile.displayName)}" maxlength="50" placeholder="Your name" />
+      </div>
+      <div>
+        <div class="profile-field-label">Catan Username</div>
+        <input type="text" id="profileCatanUsernameInput" class="profile-field-input"
+          value="${escapeAttr(profile.catanUsername || '')}" maxlength="30" placeholder="Optional username" />
+      </div>
+      <div class="small" style="opacity:.45;font-weight:700;margin-top:2px;">${escapeHTML(profile.email || '')}</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="stats-grid" style="margin-bottom:16px;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));">
+      <div class="statbox"><div class="label">Games</div><div class="value mono">${profile.totalGames || 0}</div></div>
+      <div class="statbox"><div class="label">Wins</div><div class="value mono">${profile.totalWins || 0}</div></div>
+      <div class="statbox"><div class="label">Win Rate</div><div class="value mono">${winRate}%</div></div>
+      <div class="statbox"><div class="label">Best Streak</div><div class="value mono">${profile.winStreakLongest || 0}</div></div>
+      <div class="statbox"><div class="label">Avg VP</div><div class="value mono">${avgVP}</div></div>
+      <div class="statbox"><div class="label">Avg &plusmn;</div><div class="value mono">${profile.avgMargin || 0}</div></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <h4 style="margin:8px 0 10px;color:var(--wood2);">Recent Games</h4>
+    <table>
+      <thead><tr><th>Date</th><th>Result</th><th>VP</th><th>Duration</th></tr></thead>
+      <tbody>${gamesHtml}</tbody>
+    </table>
+  `;
+
+  // ── Event handlers ──────────────────────────────────────────
+
+  qs('#profilePhotoBtn').addEventListener('click', () => {
+    qs('#profilePhotoInput').click();
+  });
+
+  qs('#profilePhotoInput').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const btn = qs('#profilePhotoBtn');
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+    try {
+      const result = await resizeAndCompressImage(file, MAX_PHOTO_SIZE, PHOTO_QUALITY);
+      await updateAvatarUrl(user.uid, result.dataUrl);
+      const circle = qs('#profileAvatarCircle');
+      if (circle) circle.innerHTML = `<img src="${escapeAttr(result.dataUrl)}" alt="" />`;
+      // Freshen header photos so they reflect the new avatar immediately
+      const headerPhoto = qs('#userPhoto');
+      if (headerPhoto) headerPhoto.src = result.dataUrl;
+      const hjPhoto = qs('#hjUserPhoto');
+      if (hjPhoto) hjPhoto.src = result.dataUrl;
+      const cached = getCurrentUserProfile();
+      if (cached) cached.avatarUrl = result.dataUrl;
+      showToast('Photo updated', 'success');
+    } catch (err) {
+      showToast('Photo upload failed', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Change photo';
+      e.target.value = '';
+    }
+  });
+
+  qs('#profileDisplayNameInput').addEventListener('blur', async (e) => {
+    const newName = e.target.value.trim();
+    if (newName && newName !== profile.displayName) {
+      await updateDisplayName(user.uid, newName);
+      profile.displayName = newName;
+      const cached = getCurrentUserProfile();
+      if (cached) cached.displayName = newName;
+      const nameEl = qs('#userName');
+      if (nameEl) nameEl.textContent = newName;
+      const hjNameEl = qs('#hjUserName');
+      if (hjNameEl) hjNameEl.textContent = newName;
+      showToast('Name updated', 'success');
+    }
+  });
+
+  qs('#profileCatanUsernameInput').addEventListener('blur', async (e) => {
+    const newUsername = e.target.value.trim();
+    if (newUsername !== (profile.catanUsername || '')) {
+      await updateCatanUsername(user.uid, newUsername);
+      profile.catanUsername = newUsername;
+      const cached = getCurrentUserProfile();
+      if (cached) cached.catanUsername = newUsername;
+      showToast('Username updated', 'success');
+    }
+  });
 }
 
 // Initialize app
@@ -1135,6 +1341,10 @@ function init() {
   qs("#loginBtn").addEventListener("click", signInWithGoogle);
   qs("#logoutBtn").addEventListener("click", signOutUser);
   qs("#landingSignInBtn").addEventListener("click", signInWithGoogle);
+
+  // Profile screen
+  qs("#profileBackBtn").addEventListener("click", () => showScreen(_profileReturnScreen || 'hostjoin'));
+  qs("#userIdentity").addEventListener("click", () => showProfileScreen('game'));
 
   // Host/join screen buttons
   qs("#hjHostBtn").addEventListener("click", startHosting);

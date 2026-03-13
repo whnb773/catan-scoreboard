@@ -19,6 +19,7 @@ async function ensureUserProfile(user) {
         displayName: user.displayName || user.email.split('@')[0],
         email: user.email,
         avatarUrl: user.photoURL || '',
+        catanUsername: '',
         colourPref: '#1f6bd6',
         createdAt: Date.now(),
         lastSeen: Date.now(),
@@ -31,10 +32,9 @@ async function ensureUserProfile(user) {
         totalRolls: 0
       });
     } else {
-      // Update lastSeen and freshen display info from Google
+      // Update lastSeen and email only — don't overwrite custom avatarUrl
       await setDoc(userRef, {
         lastSeen: Date.now(),
-        avatarUrl: user.photoURL || snap.data().avatarUrl || '',
         email: user.email
       }, { merge: true });
     }
@@ -183,6 +183,34 @@ async function updateDisplayName(uid, name) {
   } catch (err) {
     console.error('updateDisplayName error:', err);
     showToast('Failed to update name', 'error');
+  }
+}
+
+// Update a user's Catan username
+async function updateCatanUsername(uid, username) {
+  if (!uid) return;
+  const { doc, setDoc } = window.firestoreMethods;
+  const db = window.firebaseDb;
+
+  try {
+    await setDoc(doc(db, 'users', uid), { catanUsername: username.trim() }, { merge: true });
+  } catch (err) {
+    console.error('updateCatanUsername error:', err);
+    showToast('Failed to update username', 'error');
+  }
+}
+
+// Update a user's avatar (base64 dataUrl saved directly to Firestore)
+async function updateAvatarUrl(uid, dataUrl) {
+  if (!uid || !dataUrl) return;
+  const { doc, setDoc } = window.firestoreMethods;
+  const db = window.firebaseDb;
+
+  try {
+    await setDoc(doc(db, 'users', uid), { avatarUrl: dataUrl }, { merge: true });
+  } catch (err) {
+    console.error('updateAvatarUrl error:', err);
+    showToast('Failed to update photo', 'error');
   }
 }
 

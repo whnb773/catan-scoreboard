@@ -15,7 +15,8 @@ function showScreen(name) {
     login:      qs('#loginScreen'),
     hostjoin:   qs('#hostJoinScreen'),
     game:       qs('#mainApp'),
-    playerView: qs('#playerView')
+    playerView: qs('#playerView'),
+    profile:    qs('#profileScreen')
   };
   Object.keys(map).forEach(key => {
     const el = map[key];
@@ -40,6 +41,7 @@ function initAuth() {
     updateAuthUI(user);
 
     if (user) {
+      clearStaleLocalStorage();
       console.log('User signed in:', user.email);
       await ensureUserProfile(user);
       currentUserProfile = await getUserProfile(user.uid);

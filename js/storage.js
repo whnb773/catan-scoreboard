@@ -3,6 +3,16 @@
    Save/load game state to localStorage
    ============================================= */
 
+// Legacy key from the old single-file v11 build — clear this on sign-in
+const OLD_STORAGE_KEY = "catan_scoreboard_full_singlefile_fixed_v11_round_confirm_victory";
+const OLD_SNAPSHOT_KEY = OLD_STORAGE_KEY + "_snapshots";
+
+// Remove stale localStorage from the old single-file version
+function clearStaleLocalStorage() {
+  localStorage.removeItem(OLD_STORAGE_KEY);
+  localStorage.removeItem(OLD_SNAPSHOT_KEY);
+}
+
 // Export current state to object
 function exportState() {
   return {
@@ -46,17 +56,19 @@ function persist(state) {
 
 // Save all current data
 function saveAll() {
-  // Always save to localStorage (instant, works offline)
-  const ok = persist(exportState());
-  if (!ok) {
-    showToast("Save failed. Storage may be full.", "error");
-  }
-  
-  // Also save to Firestore if logged in (async, doesn't block UI)
-  if (getCurrentUser && getCurrentUser()) {
-    saveToFirestore().catch(err => {
-      console.warn('Background cloud save failed:', err);
-    });
+  if (typeof getCurrentUser === 'function' && getCurrentUser()) {
+    // Signed in: Firestore only — skip localStorage writes
+    if (typeof saveToFirestore === 'function') {
+      saveToFirestore().catch(err => {
+        console.warn('Background cloud save failed:', err);
+      });
+    }
+  } else {
+    // Not signed in: localStorage only
+    const ok = persist(exportState());
+    if (!ok) {
+      showToast("Save failed. Storage may be full.", "error");
+    }
   }
 }
 
