@@ -621,6 +621,7 @@ function renderPlayerView(snapshot) {
   if (rollBtn) {
     rollBtn.disabled = !isMyTurn;
     rollBtn.classList.toggle('pv-roll-active', isMyTurn);
+    rollBtn.textContent = isMyTurn ? '🎲 Roll Dice' : '🎲 Not your turn';
   }
 
   // Scoreboard
@@ -696,13 +697,14 @@ async function startHosting() {
     showHostJoinView('hjHosting');
     qs('#hjPinDisplay').textContent = pin;
 
-    // QR code (encodes just the PIN so joiners can scan → type it)
+    // QR code — encodes full URL with pin param so scanning opens the join screen directly
     const qrContainer = qs('#hjQrCode');
     qrContainer.innerHTML = '';
     if (typeof QRCode !== 'undefined') {
+      const joinUrl = window.location.origin + window.location.pathname + '?pin=' + pin;
       new QRCode(qrContainer, {
-        text: pin,
-        width: 128, height: 128,
+        text: joinUrl,
+        width: 160, height: 160,
         colorDark: '#3b2616', colorLight: '#f6edd8'
       });
     }
@@ -1272,6 +1274,54 @@ async function renderLeaderboard() {
 // =============================================================
 
 let _profileReturnScreen = 'hostjoin';
+let _lbReturnScreen = 'hostjoin';
+
+function showLeaderboardScreen(returnScreen) {
+  _lbReturnScreen = returnScreen || 'hostjoin';
+  showScreen('leaderboard');
+  renderLeaderboardScreen();
+}
+
+async function renderLeaderboardScreen() {
+  const el = qs('#lbContent');
+  if (!el) return;
+  const user = getCurrentUser();
+  if (!user) {
+    el.innerHTML = '<div class="pv-loading">Sign in to view the leaderboard.</div>';
+    return;
+  }
+
+  el.innerHTML = '<div class="pv-loading">Loading…</div>';
+
+  const leaders = await loadLeaderboard();
+
+  if (!leaders || leaders.length === 0) {
+    el.innerHTML = '<div class="pv-loading">No games recorded yet.</div>';
+    return;
+  }
+
+  const rows = leaders.map((p, idx) => {
+    const winRate = p.totalGames > 0 ? Math.round((p.totalWins / p.totalGames) * 100) : 0;
+    const avatarHtml = p.avatarUrl
+      ? `<img src="${escapeAttr(p.avatarUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.style.display='none'">`
+      : (p.displayName || '?').slice(0, 2).toUpperCase();
+    const isMe = p.uid === user.uid;
+    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`;
+    return `
+      <div class="lb-row${isMe ? ' lb-row--me' : ''}">
+        <div class="lb-rank">${medal}</div>
+        <div class="lb-avatar setup-avatar setup-avatar-sm">${avatarHtml}</div>
+        <div class="lb-name">${escapeHTML(p.displayName)}${isMe ? ' <span class="pv-tag pv-tag--you">You</span>' : ''}</div>
+        <div class="lb-stats">
+          <span class="lb-stat"><strong>${p.totalWins || 0}</strong><span class="pv-vp-label"> W</span></span>
+          <span class="lb-stat lb-winrate">${winRate}%</span>
+          <span class="lb-stat lb-streak">🔥${p.winStreakLongest || 0}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `<div class="lb-list">${rows}</div>`;
+}
 
 function showProfileScreen(returnScreen) {
   _profileReturnScreen = returnScreen || 'hostjoin';
@@ -1599,6 +1649,11 @@ function init() {
 
   // Profile screen
   qs("#profileBackBtn").addEventListener("click", () => showScreen(_profileReturnScreen || 'hostjoin'));
+
+  // Leaderboard screen
+  qs("#lbBackBtn")?.addEventListener("click", () => showScreen(_lbReturnScreen || 'hostjoin'));
+  qs("#hjLeaderboardBtn")?.addEventListener("click", () => showLeaderboardScreen('hostjoin'));
+  qs("#hjProfileBtn")?.addEventListener("click", () => showProfileScreen('hostjoin'));
   qs("#userIdentity").addEventListener("click", () => showProfileScreen('game'));
 
   // Host/join screen buttons
@@ -1625,6 +1680,23 @@ function init() {
   qs("#pvProfileBtn")?.addEventListener("click", () => {
     if (typeof showProfileScreen === 'function') showProfileScreen('playerView');
   });
+
+  // Handle ?pin= deep-link (from QR code scan)
+  const urlPin = new URLSearchParams(window.location.search).get('pin');
+  if (urlPin && /^\d{6}$/.test(urlPin)) {
+    // Clean the URL without reloading
+    history.replaceState(null, '', window.location.pathname);
+    // Wait for auth to settle, then navigate to the join screen with the PIN pre-filled
+    setTimeout(() => {
+      const user = getCurrentUser();
+      if (user) {
+        showScreen('hostjoin');
+        showHostJoinView('hjJoining');
+        const pinInput = qs('#hjPinInput');
+        if (pinInput) pinInput.value = urlPin;
+      }
+    }, 1200);
+  }
 
   console.log("Catan Scoreboard initialized successfully!");
 }

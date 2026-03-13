@@ -12,11 +12,12 @@ let currentUserProfile = null;
 // 'game' clears the inline style so CSS display:grid on .wrap kicks in.
 function showScreen(name) {
   const map = {
-    login:      qs('#loginScreen'),
-    hostjoin:   qs('#hostJoinScreen'),
-    game:       qs('#mainApp'),
-    playerView: qs('#playerView'),
-    profile:    qs('#profileScreen')
+    login:       qs('#loginScreen'),
+    hostjoin:    qs('#hostJoinScreen'),
+    game:        qs('#mainApp'),
+    playerView:  qs('#playerView'),
+    profile:     qs('#profileScreen'),
+    leaderboard: qs('#leaderboardScreen')
   };
   Object.keys(map).forEach(key => {
     const el = map[key];

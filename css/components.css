@@ -1391,6 +1391,83 @@ tr:last-child td {
   background: rgba(255,255,255,.18);
 }
 
+/* Home screen nav row (Profile / Leaderboard) */
+.hj-nav-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.hj-nav-btn {
+  flex: 1;
+  padding: 11px 8px !important;
+  font-size: 14px !important;
+}
+
+/* Leaderboard list */
+.lb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0,0,0,.03);
+  border: 1px solid rgba(0,0,0,.06);
+}
+
+.lb-row--me {
+  background: rgba(31,107,214,.07);
+  border-color: rgba(31,107,214,.2);
+}
+
+.lb-rank {
+  font-size: 16px;
+  font-weight: 900;
+  min-width: 28px;
+  text-align: center;
+}
+
+.lb-avatar {
+  flex-shrink: 0;
+}
+
+.lb-name {
+  flex: 1;
+  font-weight: 700;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-stats {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.lb-stat {
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.lb-winrate {
+  opacity: .65;
+}
+
+.lb-streak {
+  font-size: 12px;
+}
+
 /* =============================================================
    PLAYER VIEW (mobile scoreboard for non-host players)
    ============================================================= */

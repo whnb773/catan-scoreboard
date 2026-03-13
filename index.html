@@ -20,7 +20,7 @@
   <!-- Reset screen states immediately (guards against bfcache restoring stale DOM) -->
   <script>
     (function(){
-      var ids = ['hostJoinScreen','mainApp','playerView','profileScreen'];
+      var ids = ['hostJoinScreen','mainApp','playerView','profileScreen','leaderboardScreen'];
       for (var i=0; i<ids.length; i++) {
         var el = document.getElementById(ids[i]);
         if (el) el.style.display = 'none';
@@ -76,6 +76,11 @@
         <div class="hj-options">
           <button class="btn hj-big-btn" id="hjHostBtn">🏠&nbsp; Host a Game</button>
           <button class="btn secondary hj-big-btn" id="hjJoinBtn">🚪&nbsp; Join a Game</button>
+        </div>
+        <div class="hj-divider"></div>
+        <div class="hj-nav-row">
+          <button class="btn secondary hj-nav-btn" id="hjProfileBtn">👤 My Profile</button>
+          <button class="btn secondary hj-nav-btn" id="hjLeaderboardBtn">🏆 Leaderboard</button>
         </div>
       </div>
 
@@ -135,6 +140,19 @@
         <h2 class="profile-title">My Profile</h2>
       </div>
       <div id="profileScreenContent">
+        <div class="small" style="opacity:.6;padding:20px 0;">Loading&hellip;</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaderboard Screen -->
+  <div id="leaderboardScreen" class="profile-screen" style="display:none">
+    <div class="profile-card">
+      <div class="profile-topbar">
+        <button class="btn secondary" id="lbBackBtn" style="padding:6px 14px;font-size:13px;">&#8592; Back</button>
+        <h2 class="profile-title">🏆 Leaderboard</h2>
+      </div>
+      <div id="lbContent">
         <div class="small" style="opacity:.6;padding:20px 0;">Loading&hellip;</div>
       </div>
     </div>
